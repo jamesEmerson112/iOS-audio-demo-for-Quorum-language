@@ -2,6 +2,10 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
+
+// /Users/bam/Downloads/stefika-quorum-language-c28993dd2d09/Quorum/Library/Standard/Plugins/org/sodbeans/phonemic/tts/impl/ClientSpeak.java
+
+// stefika-quorum-language-c28993dd2d09/Quorum/Library/Standard/Plugins/org/sodbeans/phonemic/tts/impl
 package org.sodbeans.phonemic.tts.impl;
 
 import java.io.BufferedReader;
@@ -16,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.ConsoleHandler;
 import org.sodbeans.phonemic.RequestType;
 import org.sodbeans.phonemic.SpeechLanguage;
 import org.sodbeans.phonemic.SpeechPriority;
@@ -85,7 +90,15 @@ public class ClientSpeak implements TextToSpeech {
                 try {
                         Thread.sleep(100);
                     } catch (InterruptedException ex2) {
-                        Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex2);
+                        Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex2);
+                        
+                        // adding ConsoleHandler because iPhone needs this for some reasons
+                        ConsoleHandler consoleHandler = new ConsoleHandler();
+                        logger.addHandler(consoleHandler);
+
+                        if (logger.isLoggable(Level.INFO)) {
+                            logger.info("ConsoleHandler is working at line 96 from ClientSpeak.java (Initiate a connection with the server.)");
+                        }
                     }
             }
         }
@@ -133,7 +146,14 @@ public class ClientSpeak implements TextToSpeech {
                 this.output.write(msg.getBytes());
             }
         } catch (IOException ex) {
-            Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+            Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+            // adding ConsoleHandler because iPhone needs this for some reasons
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            logger.addHandler(consoleHandler);
+
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("ConsoleHandler is working at line 152 from ClientSpeak.java (Send a raw message)");
         }        
     }
     
@@ -153,7 +173,15 @@ public class ClientSpeak implements TextToSpeech {
             
             return Boolean.parseBoolean(line);
         } catch (IOException ex) {
-            Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+            Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+            // adding ConsoleHandler because iPhone needs this for some reasons
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            logger.addHandler(consoleHandler);
+
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("ConsoleHandler is working at line 179 from ClientSpeak.java (Wait for a boolean response from the server)");
+
             return false;
         }
     }
@@ -174,7 +202,15 @@ public class ClientSpeak implements TextToSpeech {
             
             return Double.parseDouble(line);
         } catch (IOException ex) {
-            Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+            Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+            // adding ConsoleHandler because iPhone needs this for some reasons
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            logger.addHandler(consoleHandler);
+
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("ConsoleHandler is working at line 208 from ClientSpeak.java (Wait for a double response from the server)");
+
             return 0.0;
         }
     }
@@ -195,7 +231,14 @@ public class ClientSpeak implements TextToSpeech {
             
             return line;
         } catch (IOException ex) {
-            Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+            Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+            // adding ConsoleHandler because iPhone needs this for some reasons
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            logger.addHandler(consoleHandler);
+
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("ConsoleHandler is working at line 237 from ClientSpeak.java (Wait for a string response from the server)");
             return "";
         }
     }
@@ -264,7 +307,14 @@ public class ClientSpeak implements TextToSpeech {
                 line = this.input.readLine();
              }
         } catch (IOException ex) {
-            Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+            Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+            // adding ConsoleHandler because iPhone needs this for some reasons
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            logger.addHandler(consoleHandler);
+
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("ConsoleHandler is working at line 313 from ClientSpeak.java (Parse lines of input until we get a blank line from getAvailableVoices)");
         }
 
         return voices.iterator(); 
@@ -327,9 +377,16 @@ public class ClientSpeak implements TextToSpeech {
                     line = this.input.readLine();
                  }
             } catch (IOException ex) {
-                Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
-                line = "";
-            }
+                Logger logger = Logger.getLogger(ClientSpeak.class.getName()).log(Level.SEVERE, null, ex);
+                        
+                // adding ConsoleHandler because iPhone needs this for some reasons
+                ConsoleHandler consoleHandler = new ConsoleHandler();
+                logger.addHandler(consoleHandler);
+
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("ConsoleHandler is working at line 383 from ClientSpeak.java (parse lines of input until we get a blank line from getAvailableEngines)");
+                    line = "";
+                }
         
         return engines.iterator();
     }
