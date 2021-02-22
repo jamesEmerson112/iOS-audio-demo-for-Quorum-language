@@ -18,6 +18,46 @@ import java.nio.ShortBuffer;
  *
  * @author alleew
  */
+
+/**
+ * @contributors: An Vo, Tony
+ */
+
+/**
+ * @classDscription: N/A, essential for white-noise generator for iOS
+ * constructors:
+ *          public quorum.Libraries.Sound.AudioSamples_ Copy()
+ *          public quorum.Libraries.Sound.AudioSamples_ Copy(int start, int end)
+ *          public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel)
+ *          public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel, int start, int end)
+ *
+ * Static member:
+ *          {create an audio class Audio
+ *          construct AudioSamples_ samples to the AudioSamples class
+ *          set samples size to 0
+ *          load samples
+ *          dispose audio}
+ *
+ *          Object me_
+ *          int MAX_SHORT
+ *          short[] buffer;
+ *          int samplesPerSecond = 44100;
+ *          int channels = 1;
+ *
+ * Functions:
+ *      public void SetChannels(int c)
+ *      public int GetChannels()
+ *      public void SetSamplesPerSecond(int samples)
+ *      public int GetSamplesPerSecond()
+ *      public void SetSizeInSeconds(double seconds)
+ *      public double GetSizeInSeconds()
+ *      public void SetTotalSize(int samples)
+ *      public int GetTotalSize()
+ *      public void Set(int index, double value, int channel)
+ *      public double Get(int index, int channel)
+ *      public void Load(quorum.Libraries.System.File_ quorumFile)
+ *
+ */
 public class AudioSamples 
 {
     static
@@ -28,6 +68,68 @@ public class AudioSamples
         samples.SetTotalSize(0);
         audio.Load(samples);
         audio.Dispose();
+    }
+
+    public quorum.Libraries.Sound.AudioSamples_ Copy()
+    {
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        copy.plugin_.samplesPerSecond = samplesPerSecond;
+        copy.plugin_.channels = channels;
+        short[] array = buffer.clone();
+        copy.plugin_.buffer = array;
+        return copy;
+    }
+
+    public quorum.Libraries.Sound.AudioSamples_ Copy(int start, int end)
+    {
+        if (start > end)
+        {
+            int temp = start;
+            start = end;
+            end = temp;
+        }
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        copy.plugin_.samplesPerSecond = samplesPerSecond;
+        copy.plugin_.channels = channels;
+        short[] array = new short[(end - start + 1) * channels];
+        System.arraycopy(buffer, start * channels, array, 0, (end - start + 1) * channels);
+        copy.plugin_.buffer = array;
+        return copy;
+    }
+
+    public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel)
+    {
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        copy.plugin_.samplesPerSecond = samplesPerSecond;
+        copy.plugin_.channels = 1;
+        short[] array = new short[buffer.length / channels];
+        for (int i = 0; i < array.length; i++)
+        {
+            array[i] = buffer[i * channels + channel];
+        }
+        copy.plugin_.buffer = array;
+        return copy;
+    }
+
+    public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel, int start, int end)
+    {
+        if (start > end)
+        {
+            int temp = start;
+            start = end;
+            end = temp;
+        }
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        copy.plugin_.samplesPerSecond = samplesPerSecond;
+        copy.plugin_.channels = 1;
+        short[] array = new short[(end - start + 1)];
+        int channelStart = (channels * start) + channel;
+        for (int i = 0; i < array.length; i++)
+        {
+            array[i] = buffer[channelStart + i * channels];
+        }
+        copy.plugin_.buffer = array;
+        return copy;
     }
     
     public Object me_ = null;
@@ -93,67 +195,7 @@ public class AudioSamples
         return buffer[index * channels + channel] / (double)MAX_SHORT;
     }
     
-    public quorum.Libraries.Sound.AudioSamples_ Copy()
-    {
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
-        copy.plugin_.samplesPerSecond = samplesPerSecond;
-        copy.plugin_.channels = channels;
-        short[] array = buffer.clone();
-        copy.plugin_.buffer = array;
-        return copy;
-    }
-    
-    public quorum.Libraries.Sound.AudioSamples_ Copy(int start, int end)
-    {
-        if (start > end)
-        {
-            int temp = start;
-            start = end;
-            end = temp;
-        }
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
-        copy.plugin_.samplesPerSecond = samplesPerSecond;
-        copy.plugin_.channels = channels;
-        short[] array = new short[(end - start + 1) * channels];
-        System.arraycopy(buffer, start * channels, array, 0, (end - start + 1) * channels);
-        copy.plugin_.buffer = array;
-        return copy;
-    }
-    
-    public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel)
-    {
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
-        copy.plugin_.samplesPerSecond = samplesPerSecond;
-        copy.plugin_.channels = 1;
-        short[] array = new short[buffer.length / channels];
-        for (int i = 0; i < array.length; i++)
-        {
-            array[i] = buffer[i * channels + channel];
-        }
-        copy.plugin_.buffer = array;
-        return copy;
-    }
-    
-    public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel, int start, int end)
-    {
-        if (start > end)
-        {
-            int temp = start;
-            start = end;
-            end = temp;
-        }
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
-        copy.plugin_.samplesPerSecond = samplesPerSecond;
-        copy.plugin_.channels = 1;
-        short[] array = new short[(end - start + 1)];
-        int channelStart = (channels * start) + channel;
-        for (int i = 0; i < array.length; i++)
-        {
-            array[i] = buffer[channelStart + i * channels];
-        }
-        copy.plugin_.buffer = array;
-        return copy;
-    }
+
     
     public void Load(quorum.Libraries.System.File_ quorumFile)
     {
