@@ -18,6 +18,9 @@ Inside of Quorum Studio, open Quorum, which is under quorum-language/Quorum
 Build the project normally
 
 ###Log
+02/24/2021
+What's "AudioSamples_"? And why are not using "AudioSamples" instead?
+
 02/21/2021
 AudioSamples class is at Plugin/SoundPlugin/SoundPlugin/src/plugins/quorum/Libraries/Sound
 there are 17 related problems needed to be sorted out

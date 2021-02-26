@@ -70,9 +70,14 @@ public class AudioSamples
         audio.Dispose();
     }
 
+    /**
+     * function copy is a constructor for AudioSamples_
+     * it constructing a new AudioSamples, and copied into a newly declared AudioSamples_
+     * @return: copy
+     */
     public quorum.Libraries.Sound.AudioSamples_ Copy()
     {
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = channels;
         short[] array = buffer.clone();
@@ -80,6 +85,12 @@ public class AudioSamples
         return copy;
     }
 
+    /**
+     * function copy is a constructor for AudioSamples_
+     * it constructing a new AudioSamples, and copied into a newly declared AudioSamples
+     * parameters: int start (of a sound channel?), int end (of a sound channel)
+     * @return: copy
+     */
     public quorum.Libraries.Sound.AudioSamples_ Copy(int start, int end)
     {
         if (start > end)
@@ -88,7 +99,7 @@ public class AudioSamples
             start = end;
             end = temp;
         }
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = channels;
         short[] array = new short[(end - start + 1) * channels];
@@ -97,9 +108,15 @@ public class AudioSamples
         return copy;
     }
 
+    /**
+     * function copy is a constructor for AudioSamples_
+     * it constructing a new AudioSamples, and copied into a newly declared AudioSamples
+     * parameters: int channel
+     * @return: copy
+     */
     public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel)
     {
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = 1;
         short[] array = new short[buffer.length / channels];
@@ -111,6 +128,12 @@ public class AudioSamples
         return copy;
     }
 
+    /**
+     * function copy is a constructor for AudioSamples_
+     * it constructing a new AudioSamples, and copied into a newly declared AudioSamples
+     * parameters: int start (of a sound channel?), int end (of a sound channel), int channel
+     * @return: copy
+     */
     public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel, int start, int end)
     {
         if (start > end)
@@ -119,7 +142,7 @@ public class AudioSamples
             start = end;
             end = temp;
         }
-        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = 1;
         short[] array = new short[(end - start + 1)];
@@ -131,39 +154,71 @@ public class AudioSamples
         copy.plugin_.buffer = array;
         return copy;
     }
-    
+
+    /**
+     * legacy code
+     * Unclear what me_ does
+     */
     public Object me_ = null;
-    
+
+
     public static final int MAX_SHORT = java.lang.Short.MAX_VALUE;
     public short[] buffer;
     public int samplesPerSecond = 44100;
     public int channels = 1;
-    
+
+    /**
+     * function SetChannels sets the channel to the class AudioSamples
+     * @param c
+     * @return none (channels)
+     */
     public void SetChannels(int c)
     {
         channels = c;
     }
-    
+
+    /**
+     * function GetChannels returns the channels of the class AudioSamples
+     * @return int channels
+     */
     public int GetChannels()
     {
         return channels;
     }
-    
+
+    /**
+     * function SetSamplesPerSecond set int samples to samplesPerSecond of AudioSamples
+     * @param samples
+     * @return none
+     */
     public void SetSamplesPerSecond(int samples)
     {
         samplesPerSecond = samples;
     }
-    
+
+    /**
+     * function GetSamplesPerSecond returns the samplesPerSecond of AudioSamples
+     * @return samplesPerSecond
+     */
     public int GetSamplesPerSecond()
     {
         return samplesPerSecond;
     }
-    
+
+    /**
+     * function SetSizeInSeconds sets the total size of the set of samples for the buffer
+     * @param seconds
+     * @return none
+     */
     public void SetSizeInSeconds(double seconds)
     {
         SetTotalSize((int)(seconds * samplesPerSecond) * channels);
     }
-    
+
+    /**
+     * function GetSizeInSeconds return buffer size per samplesPerSecond per Channels
+     * @return buffer.length / samplesPerSeconds / channels
+     */
     public double GetSizeInSeconds()
     {
         if (buffer == null)
@@ -171,12 +226,20 @@ public class AudioSamples
         
         return (buffer.length / (double)samplesPerSecond) / channels;
     }
-    
+
+    /**
+     * function SetTotalSize sets the buffer size
+     * @param samples
+     */
     public void SetTotalSize(int samples)
     {
         buffer = new short[samples];
     }
-    
+
+    /**
+     * function SetTotalSize sets the buffer size
+     * @return buffer.length
+     */
     public int GetTotalSize()
     {
         if (buffer == null)
@@ -184,6 +247,8 @@ public class AudioSamples
 
         return buffer.length;
     }
+
+
     
     public void Set(int index, double value, int channel)
     {
