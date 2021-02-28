@@ -17,6 +17,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.ALC11;
+import org.lwjgl.openal.ALCdevice;
 import quorum.Libraries.Sound.AudioSamples_;
 
 /**

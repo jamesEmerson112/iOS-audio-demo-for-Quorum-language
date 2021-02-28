@@ -24,7 +24,7 @@ import java.nio.ShortBuffer;
  */
 
 /**
- * @classDscription: N/A, essential for white-noise generator for iOS
+ * @classDescription: N/A, essential for white-noise generator for iOS
  * constructors:
  *          public quorum.Libraries.Sound.AudioSamples_ Copy()
  *          public quorum.Libraries.Sound.AudioSamples_ Copy(int start, int end)
@@ -58,7 +58,7 @@ import java.nio.ShortBuffer;
  *      public void Load(quorum.Libraries.System.File_ quorumFile)
  *
  */
-public class AudioSamples 
+public class AudioSamples
 {
     static
     {
@@ -287,9 +287,9 @@ public class AudioSamples
             throw new RuntimeException("Can't load file " + file.getAbsolutePath() + " because the file extension is unsupported!");
         
         ByteBuffer buffer = ByteBuffer.allocateDirect(bytes.length);
-	buffer.order(ByteOrder.nativeOrder());
-	buffer.put(bytes, 0, bytes.length);
-	buffer.flip();
+        buffer.order(ByteOrder.nativeOrder());
+        buffer.put(bytes, 0, bytes.length);
+        buffer.flip();
         
         ShortBuffer b = buffer.asShortBuffer();
         this.buffer = new short[b.limit()];
