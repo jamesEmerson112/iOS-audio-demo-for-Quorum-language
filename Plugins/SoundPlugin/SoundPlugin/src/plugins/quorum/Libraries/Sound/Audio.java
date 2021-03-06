@@ -20,10 +20,12 @@ import quorum.Libraries.Sound.AudioSamples_;
  * @author alleew
  */
 public class Audio {
-    
+
+
+    private static Data data;
     public java.lang.Object me_ = null;
     
-    Data data;
+//    Data data;
     
     public static final DataLoader loader;
     public static final AudioManager audioManager;
@@ -91,7 +93,7 @@ public class Audio {
         data = loader.LoadToStream(quorumFile);
     }
     
-    public void Load(AudioSamples_ samples)
+    public static void Load(AudioSamples_ samples)
     {
         if (data != null)
             throw new RuntimeException("This audio has already been loaded! To reuse this audio, call Dispose() before loading again.");

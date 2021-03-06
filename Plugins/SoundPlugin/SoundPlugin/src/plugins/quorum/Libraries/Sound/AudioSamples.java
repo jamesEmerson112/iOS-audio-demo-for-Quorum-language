@@ -53,8 +53,8 @@ import java.nio.ShortBuffer;
  *      public double GetSizeInSeconds()
  *      public void SetTotalSize(int samples)
  *      public int GetTotalSize()
- *      public void Set(int index, double value, int channel)
- *      public double Get(int index, int channel)
+ *      public void SetBuffer(int index, double value, int channel)
+ *      public double GetBuffer(int index, int channel)
  *      public void Load(quorum.Libraries.System.File_ quorumFile)
  *
  */
@@ -250,12 +250,12 @@ public class AudioSamples
 
 
     
-    public void Set(int index, double value, int channel)
+    public void SetBuffer(int index, double value, int channel)
     {
         buffer[index * channels + channel] = (short)(value * MAX_SHORT);
     }
     
-    public double Get(int index, int channel)
+    public double GetBuffer(int index, int channel)
     {
         return buffer[index * channels + channel] / (double)MAX_SHORT;
     }

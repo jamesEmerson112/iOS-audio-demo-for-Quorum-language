@@ -5,6 +5,7 @@
  */
 package plugins.quorum.Libraries.Sound.IOS;
 
+import plugins.quorum.Libraries.Sound.Audio;
 import plugins.quorum.Libraries.Sound.Data;
 import plugins.quorum.Libraries.Sound.DataLoader;
 import quorum.Libraries.System.File_;
@@ -38,13 +39,16 @@ public class IOSLoader implements DataLoader
     }
     
     @Override
-    public Data Load(quorum.Libraries.Sound.AudioSamples_ buffer)
+    public Data Load(quorum.Libraries.Sound.AudioSamples_ audioSamples)
     {
-        throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
+//        throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
+//        return new IOSSoundData(audioSamples);
+        Audio.Load(audioSamples);
+        return null;
     }
     
     @Override
-    public Data LoadToStream(quorum.Libraries.Sound.AudioSamples_ buffer)
+    public Data LoadToStream(quorum.Libraries.Sound.AudioSamples_ audioSamples)
     {
         throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
     }

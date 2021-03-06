@@ -35,7 +35,17 @@ public class IOSSoundData extends Data
         channel = OALSimpleAudio.sharedInstance().getChannelSource();
         sourcePool = channel.getSourcePool().getSources();
     }
-    
+
+// *          Object me_
+// *          int MAX_SHORT
+// *          short[] buffer;
+// *          int samplesPerSecond = 44100;
+// *          int channels = 1;
+//    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
+//    {
+////        channel = samples.
+//    }
+
     @Override
     public void Play() 
     {
