@@ -42,9 +42,18 @@ public class IOSSoundData extends Data
 // *          int samplesPerSecond = 44100;
 // *          int channels = 1;
 //    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
-//    {
-////        channel = samples.
-//    }
+
+//    OALSimpleAudio only works if an ALBuffer is passed
+    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
+    {
+        int channelInt = samples.GetChannels();
+//        channel = (ALChannelSource)channelInt;
+        quorum.Libraries.System.File_ quorumFile = new quorum.Libraries.System.File(samples);
+        soundPath = quorumFile.GetAbsolutePath().replace('\\', '/');
+        soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect((soundPath));
+        channel = OALSimpleAudio.sharedInstance().getChannelSource();
+        sourcePool = channel.getSourcePool().getSources();
+    }
 
     @Override
     public void Play() 

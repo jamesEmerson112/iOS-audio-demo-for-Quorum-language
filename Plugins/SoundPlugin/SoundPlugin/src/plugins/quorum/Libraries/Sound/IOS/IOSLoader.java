@@ -42,9 +42,9 @@ public class IOSLoader implements DataLoader
     public Data Load(quorum.Libraries.Sound.AudioSamples_ audioSamples)
     {
 //        throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
-//        return new IOSSoundData(audioSamples);
-        Audio.Load(audioSamples);
-        return null;
+        return new IOSSoundData(audioSamples);
+//        Audio.Load(audioSamples);
+//        return null;
     }
     
     @Override

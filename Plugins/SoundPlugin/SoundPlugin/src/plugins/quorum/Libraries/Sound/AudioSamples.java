@@ -9,6 +9,8 @@ import plugins.quorum.Libraries.Sound.Desktop.WavInputStream;
 import plugins.quorum.Libraries.Sound.Desktop.OggInputStream;
 import plugins.quorum.Libraries.Sound.Desktop.WavData;
 import plugins.quorum.Libraries.Sound.Desktop.OggData;
+import plugins.quorum.Libraries.System.QuorumFile;
+
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -259,9 +261,33 @@ public class AudioSamples
     {
         return buffer[index * channels + channel] / (double)MAX_SHORT;
     }
-    
 
-    
+//*          Object me_
+// *          int MAX_SHORT
+// *          short[] buffer;
+// *          int samplesPerSecond = 44100;
+// *          int channels = 1;
+    public quorum.Libraries.System.File_ GetQuorumFile()
+    {
+//        quorum.Libraries.System.File_ quorumFile = new quorum.Libraries.System.File_();
+//        File file = new File(quorumFile.GetAbsolutePath());
+//        String filename = file.getName().toLowerCase();
+//        byte[] bytes;
+//        int channels, sampleRate;
+//
+//        // we have no idea how the constructor of File_ works; therefore, we will handle
+//        // the quorumFile with cases like Load function does
+//
+//        return quorumFile;
+        QuorumFile quorumFile = new QuorumFile();
+        return null;
+    }
+
+    /**
+     * function Load loads a quorumFile into an AudioSamples
+     * and convert it to AudioSamples format
+     * @return buffer.length
+     */
     public void Load(quorum.Libraries.System.File_ quorumFile)
     {
         File file = new File(quorumFile.GetAbsolutePath());

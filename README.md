@@ -23,7 +23,10 @@ there are 2 options:
     1. make AudioSamples save an audio file and have it return a string so that
 IOSSoundData can read
    2. Implement IOSSsoundData so that it can handle the short array of file
-
+    3. convert audiosamples to File_
+    4. ask where to locate the master project for netBeans
+      5. ask to speak to alleew (from audiosamples) and Jeff Willson from FilePlugin
+    
 
 02/24/2021
 What's "AudioSamples_"? And why are not using "AudioSamples" instead?
