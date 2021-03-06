@@ -19,12 +19,31 @@ package plugins.quorum.Libraries.Sound.IOS;
 import org.robovm.apple.foundation.NSObject;
 import org.robovm.objc.annotation.NotImplemented;
 
+import java.io.PrintStream;
+
 /**
  * @author Niklas Therning
+ * @contributor An Vo
  */
 public class AVAudioPlayerDelegateAdapter extends NSObject implements AVAudioPlayerDelegate {
 	@NotImplemented("audioPlayerDidFinishPlaying:successfully:")
 	public void didFinishPlaying (NSObject player, boolean success) {
-		throw new UnsupportedOperationException();
+		try {
+			PrintStream stream = new PrintStream(System.out);
+			if (success)
+			{
+				// print out running successfully
+				stream.print("Audio Player did finish playing succesffully");
+			}
+			else if (!success)
+			{
+				// print out running unsuccessfully
+				stream.print("Audio Player did NOT finish playing succesffully");
+			}
+			stream.flush();
+		}
+		catch (Exception e) {
+			System.out.println(e);
+		}
 	}
 }

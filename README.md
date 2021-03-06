@@ -18,6 +18,13 @@ Inside of Quorum Studio, open Quorum, which is under quorum-language/Quorum
 Build the project normally
 
 ###Log
+03/05/2021
+there are 2 options:
+    1. make AudioSamples save an audio file and have it return a string so that
+IOSSoundData can read
+   2. Implement IOSSsoundData so that it can handle the short array of file
+
+
 02/24/2021
 What's "AudioSamples_"? And why are not using "AudioSamples" instead?
 
