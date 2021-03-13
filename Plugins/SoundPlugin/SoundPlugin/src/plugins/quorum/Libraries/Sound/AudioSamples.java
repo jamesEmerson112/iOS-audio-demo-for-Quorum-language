@@ -262,6 +262,11 @@ public class AudioSamples
         return buffer[index * channels + channel] / (double)MAX_SHORT;
     }
 
+    public short[] GetBufferShort()
+    {
+        return buffer;
+    }
+
 //*          Object me_
 // *          int MAX_SHORT
 // *          short[] buffer;
@@ -286,7 +291,7 @@ public class AudioSamples
     /**
      * function Load loads a quorumFile into an AudioSamples
      * and convert it to AudioSamples format
-     * @return buffer.length
+     *
      */
     public void Load(quorum.Libraries.System.File_ quorumFile)
     {
