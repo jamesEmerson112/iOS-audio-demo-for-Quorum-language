@@ -42,17 +42,59 @@ public class IOSSoundData extends Data
 // *          int samplesPerSecond = 44100;
 // *          int channels = 1;
 //    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
-
 //    OALSimpleAudio only works if an ALBuffer is passed
+
     public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
     {
-        int channelInt = samples.GetChannels();
-//        channel = (ALChannelSource)channelInt;
-        quorum.Libraries.System.File_ quorumFile = new quorum.Libraries.System.File(samples);
-        soundPath = quorumFile.GetAbsolutePath().replace('\\', '/');
-        soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect((soundPath));
-        channel = OALSimpleAudio.sharedInstance().getChannelSource();
-        sourcePool = channel.getSourcePool().getSources();
+//        int channelInt = samples.GetChannels();
+////      channel = (ALChannelSource)channelInt;
+//        quorum.Libraries.System.File_ quorumFile = new quorum.Libraries.System.File(samples);
+//        soundPath = quorumFile.GetAbsolutePath().replace('\\', '/');
+//        soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect((soundPath));
+//        channel = OALSimpleAudio.sharedInstance().getChannelSource();
+//        sourcePool = channel.getSourcePool().getSources();
+        PlayAudioSamples(samples);
+    }
+
+
+    /*
+     * function void PlayAudioSamples is to play the audio Short buffer from AudioSamples
+     * parameters: AudioSample_ samples
+     * @return: non
+     */
+    public void PlayAudioSamples(quorum.Libraries.Sound.AudioSamples_ samples)
+    {
+//        1. convert short[] to byte[]
+//        2. read the byte array to the speakers
+
+        // initialize audio format
+        AudioFormat format = new AudioFormat(8000.0f, 16, 1, true, true);
+        SourceDataLine speakers;
+
+        int shortRead = 0;
+        int bufferSize = 0;
+        int i = 0;
+
+        short[] buffer = audioSamples.GetBufferShort(); // this returns the buffer
+
+        // convert shortBuffer to byteBuffer
+        bufferSize = audioSamples.GetTotalSize();
+        short[] short_buffer_array = audioSamples.GetBufferShort();
+        ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize*2));  // return buffer size
+        while(bufferSize>=i)
+        {
+            byte_buffer=putShort(short_buffer_array[i]);
+            i++;
+        }
+
+        byte[] byte_buffer_array = new byte[bufferSize*2];
+        byte_buffer_array = byte_buffer.array();
+        // finished converting
+
+        // read audio from the byte array using sun.audio package
+        AudioData audioData = new AudioData(byte_buffer_array);
+        AudioDataStream audioStream = new AudioDataStream(audioData);
+        AudioPlayer.player.start(audioStream);
     }
 
     @Override
