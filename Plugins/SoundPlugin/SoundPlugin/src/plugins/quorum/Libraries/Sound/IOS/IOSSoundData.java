@@ -27,7 +27,8 @@ public class IOSSoundData extends Data
     private StreamContainer streamIDs = new StreamContainer(8);
     
     private long soundID = -1;
-    
+
+
     public IOSSoundData(quorum.Libraries.System.File_ quorumFile)
     {
         soundPath = quorumFile.GetAbsolutePath().replace('\\', '/');
@@ -53,6 +54,11 @@ public class IOSSoundData extends Data
 //        soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect((soundPath));
 //        channel = OALSimpleAudio.sharedInstance().getChannelSource();
 //        sourcePool = channel.getSourcePool().getSources();
+        channel = samples.GetChannels();
+        soundPath = null;    // AudioSamples does not save data into a File; therefore, no sound path is needed
+        soundBuffer = null;  // ALBuffer does not have a function to convert from one type to ALBuffer (because it
+                             // is a native class
+        sourcePool = null;   // no NS array generated from audio Samples
         PlayAudioSamples(samples);
     }
 
