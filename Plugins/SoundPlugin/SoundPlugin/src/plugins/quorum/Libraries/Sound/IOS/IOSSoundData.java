@@ -6,12 +6,18 @@
 package plugins.quorum.Libraries.Sound.IOS;
 
 import java.util.Arrays;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.SourceDataLine;
 import org.robovm.apple.foundation.NSArray;
+import plugins.quorum.Libraries.Sound.AudioSamples;
 import plugins.quorum.Libraries.Sound.Data;
 import org.robovm.apple.foundation.Foundation;
 import org.robovm.apple.foundation.NSString;
 import org.robovm.apple.uikit.UIDevice;
 import quorum.Libraries.Sound.AudioSamples_;
+
+import java.nio.*;
+import java.util.*;
 
 /**
  *
@@ -25,7 +31,10 @@ public class IOSSoundData extends Data
     private ALChannelSource channel;
     private NSArray<ALSource> sourcePool;
     private StreamContainer streamIDs = new StreamContainer(8);
-    
+
+    private int index_audio_samples = 0;
+    private StreamContainerAudioSamples streamSamples = new StreamContainerAudioSamples(8);
+
     private long soundID = -1;
 
 
@@ -89,7 +98,7 @@ public class IOSSoundData extends Data
         ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize*2));  // return buffer size
         while(bufferSize>=i)
         {
-            byte_buffer=putShort(short_buffer_array[i]);
+            byte_buffer = putShort(short_buffer_array[i]);
             i++;
         }
 
@@ -324,7 +333,9 @@ public class IOSSoundData extends Data
     @Override
     public void QueueSamples(AudioSamples_ samples)
     {
-        throw new RuntimeException("This audio was not set for streaming AudioSamples when loaded. Use LoadToStream(AudioSamples) to allow for sample queueing.");
+//        throw new RuntimeException("This audio was not set for streaming AudioSamples when loaded. Use LoadToStream(AudioSamples) to allow for sample queueing.");
+        streamSamples.insert(this.index_audio_samples, samples);
+        this.index_audio_samples++;
     }
     
     @Override
@@ -402,6 +413,46 @@ public class IOSSoundData extends Data
 		this.items = newItems;
 		return newItems;
 	}
+    }
+
+    /*
+     * class StreamContainerAudioSamples is designed to be a stream container for
+     * AudioSamples
+     */
+    private class StreamContainerAudioSamples
+    {
+        public int size;
+        public boolean ordered;
+        public AudioSamples[] items;
+
+        /** Creates an ordered array with a capacity of 16. */
+        public StreamContainerAudioSamples () {
+            this(true, 16);
+        }
+
+        public StreamContainerAudioSamples(boolean b, int i)
+        {
+            this.ordered = b;
+            items = new AudioSamples[i];
+        }
+
+        public StreamContainerAudioSamples(int i)
+        {
+            this.ordered = false;
+            items = new AudioSamples[i];
+        }
+
+        public void insert (int index, AudioSamples_ audioSamples) {
+            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+            AudioSamples[] items = this.items;
+            if (size == items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
+            if (ordered)
+                System.arraycopy(items, index, items, index + 1, size - index);
+            else
+                items[size] = items[index];
+            size++;
+            items[index] = audioSamples;
+        }
     }
     
     @Override

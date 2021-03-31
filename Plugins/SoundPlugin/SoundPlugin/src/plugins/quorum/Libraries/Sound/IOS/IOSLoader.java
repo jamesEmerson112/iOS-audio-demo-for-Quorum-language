@@ -6,7 +6,6 @@
 package plugins.quorum.Libraries.Sound.IOS;
 
 import java.lang.Object;
-import sun.audio;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,6 +24,8 @@ import plugins.quorum.Libraries.Sound.Data;
 import plugins.quorum.Libraries.Sound.DataLoader;
 import plugins.quorum.Libraries.Sound.Desktop.AudioData;
 import quorum.Libraries.System.File_;
+
+import plugins.quorum.Libraries.Sound.IOS.IOSSoundData;
 
 
 /**
@@ -65,7 +66,15 @@ public class IOSLoader implements DataLoader
     @Override
     public Data LoadToStream(quorum.Libraries.Sound.AudioSamples_ audioSamples)
     {
-        throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
+        // throw new UnsupportedOperationException("Direct AudioBuffer manipulation is not currently supported on this platform.");
+    
+        // trying the stream class in IOSSoundData that james made
+        
+        IOSSoundData stream = new IOSSoundData(audioSamples); // idk
+        stream.QueueSamples(audioSamples);
+        stream.PlayAudioSamples(audioSamples);
+        
+        return null;
     }
     
 }
