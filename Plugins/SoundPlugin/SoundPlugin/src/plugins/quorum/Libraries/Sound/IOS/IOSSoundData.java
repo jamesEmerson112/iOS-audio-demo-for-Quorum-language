@@ -6,8 +6,11 @@
 package plugins.quorum.Libraries.Sound.IOS;
 
 import java.util.Arrays;
+<<<<<<< HEAD
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.SourceDataLine;
+=======
+>>>>>>> 9b00c3e9c0fd53e62ae433f234c784bcf3f564fb
 import org.robovm.apple.foundation.NSArray;
 import plugins.quorum.Libraries.Sound.AudioSamples;
 import plugins.quorum.Libraries.Sound.Data;
@@ -16,9 +19,12 @@ import org.robovm.apple.foundation.NSString;
 import org.robovm.apple.uikit.UIDevice;
 import quorum.Libraries.Sound.AudioSamples_;
 
+<<<<<<< HEAD
 import java.nio.*;
 import java.util.*;
 
+=======
+>>>>>>> 9b00c3e9c0fd53e62ae433f234c784bcf3f564fb
 /**
  *
  * @author alleew
@@ -98,7 +104,11 @@ public class IOSSoundData extends Data
         ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize*2));  // return buffer size
         while(bufferSize>=i)
         {
+<<<<<<< HEAD
             byte_buffer = putShort(short_buffer_array[i]);
+=======
+            byte_buffer=putShort(short_buffer_array[i]);
+>>>>>>> 9b00c3e9c0fd53e62ae433f234c784bcf3f564fb
             i++;
         }
 

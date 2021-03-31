@@ -171,14 +171,23 @@ public class AndroidAudioManager implements AudioManager, OnLoadCompleteListener
     @Override
     public void EnableListenerDoppler() 
     {
+<<<<<<< HEAD
         
+=======
+        AndroidApplication.LogStatic("Quorum Audio", "Ignored call to EnableListenerDoppler() -- this functionality isn't supported yet on Android.");
+>>>>>>> 9b00c3e9c0fd53e62ae433f234c784bcf3f564fb
     }
 
     @Override
     public void DisableListenerDoppler() 
     {
+<<<<<<< HEAD
         
     }
+=======
+        AndroidApplication.LogStatic("Quorum Audio", "Ignored call to DisableListenerDoppler() -- this functionality isn't supported yet on Android.");
+    }ds
+>>>>>>> 9b00c3e9c0fd53e62ae433f234c784bcf3f564fb
 
     @Override
     public boolean IsListenerDopplerEnabled() 
