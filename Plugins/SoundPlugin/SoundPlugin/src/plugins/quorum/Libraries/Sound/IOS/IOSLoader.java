@@ -70,10 +70,11 @@ public class IOSLoader implements DataLoader
     
         // trying the stream class in IOSSoundData that james made
         
-        IOSSoundData stream = new IOSSoundData(audioSamples); // idk
+        IOSSoundData stream = new IOSSoundData(audioSamples);
+
+        // queue up stream container -
         stream.QueueSamples(audioSamples);
-        stream.PlayAudioSamples(audioSamples);
-        
+//        stream.PlayAudioSamples(audioSamples); - dont think we need to play audio here
         return null;
     }
     
