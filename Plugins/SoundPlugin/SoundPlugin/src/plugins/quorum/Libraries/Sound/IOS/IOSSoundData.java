@@ -5,6 +5,7 @@
  */
 package plugins.quorum.Libraries.Sound.IOS;
 
+
 import java.util.Arrays;
 
 import javax.sound.sampled.AudioFormat;
@@ -16,20 +17,21 @@ import plugins.quorum.Libraries.Sound.Data;
 import org.robovm.apple.foundation.Foundation;
 import org.robovm.apple.foundation.NSString;
 import org.robovm.apple.uikit.UIDevice;
-import quorum.Libraries.Sound.AudioSamples_;
+import quorum.Libraries.Sound.*;
 
-import java.nio.*;
+import sun.audio.*;
+
+import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
  *
  * @author alleew
  */
-public class IOSSoundData extends Data
-{
+public class IOSSoundData extends Data {
     private ALBuffer soundBuffer;
     private String soundPath;
-    
+
     private ALChannelSource channel;
     private NSArray<ALSource> sourcePool;
     private StreamContainer streamIDs = new StreamContainer(8);
@@ -40,8 +42,7 @@ public class IOSSoundData extends Data
     private long soundID = -1;
 
 
-    public IOSSoundData(quorum.Libraries.System.File_ quorumFile)
-    {
+    public IOSSoundData(quorum.Libraries.System.File_ quorumFile) {
         soundPath = quorumFile.GetAbsolutePath().replace('\\', '/');
         soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect(soundPath);
         channel = OALSimpleAudio.sharedInstance().getChannelSource();
@@ -56,8 +57,7 @@ public class IOSSoundData extends Data
 //    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
 //    OALSimpleAudio only works if an ALBuffer is passed
 
-    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
-    {
+    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ data) {
 //        int channelInt = samples.GetChannels();
 ////      channel = (ALChannelSource)channelInt;
 //        quorum.Libraries.System.File_ quorumFile = new quorum.Libraries.System.File(samples);
@@ -65,12 +65,12 @@ public class IOSSoundData extends Data
 //        soundBuffer = OALSimpleAudio.sharedInstance().preloadEffect((soundPath));
 //        channel = OALSimpleAudio.sharedInstance().getChannelSource();
 //        sourcePool = channel.getSourcePool().getSources();
-        channel = samples.GetChannels();
+        //channel = samples.GetChannels();
         soundPath = null;    // AudioSamples does not save data into a File; therefore, no sound path is needed
         soundBuffer = null;  // ALBuffer does not have a function to convert from one type to ALBuffer (because it
-                             // is a native class
+        // is a native class
         sourcePool = null;   // no NS array generated from audio Samples
-        PlayAudioSamples(samples);
+        PlayAudioSamples(data);
     }
 
 
@@ -79,32 +79,34 @@ public class IOSSoundData extends Data
      * parameters: AudioSample_ samples
      * @return: non
      */
-    public void PlayAudioSamples(quorum.Libraries.Sound.AudioSamples_ samples)
-    {
+    public void PlayAudioSamples(quorum.Libraries.Sound.AudioSamples_ data) {
 //        1. convert short[] to byte[]
 //        2. read the byte array to the speakers
+
+        AudioSamples samples = (AudioSamples) data; 
 
         // initialize audio format
         AudioFormat format = new AudioFormat(8000.0f, 16, 1, true, true);
         SourceDataLine speakers;
 
         int shortRead = 0;
-        int bufferSize = 0;
+        int bufferSize = samples.GetTotalSize();
         int i = 0;
 
-        short[] buffer = audioSamples.GetBufferShort(); // this returns the buffer
+
+        short[] buffer; // this returns the buffer
+        buffer = samples.GetBufferShort();    // cast AudioSamples_ to AudioSamples
 
         // convert shortBuffer to byteBuffer
-        bufferSize = audioSamples.GetTotalSize();
-        short[] short_buffer_array = audioSamples.GetBufferShort();
-        ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize*2));  // return buffer size
-        while(bufferSize>=i)
-        {
-            byte_buffer = putShort(short_buffer_array[i]);
+        bufferSize = samples.GetTotalSize();
+        short[] short_buffer_array = samples.GetBufferShort();
+        ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize * 2));  // return buffer size
+        while (bufferSize >= i) {
+            byte_buffer.putShort(short_buffer_array[i]);
             i++;
         }
 
-        byte[] byte_buffer_array = new byte[bufferSize*2];
+        byte[] byte_buffer_array = new byte[bufferSize * 2];
         byte_buffer_array = byte_buffer.array();
         // finished converting
 
@@ -115,14 +117,12 @@ public class IOSSoundData extends Data
     }
 
     @Override
-    public void Play() 
-    {
+    public void Play() {
         Play(isLooping);
     }
-    
-    public void Play(boolean loop)
-    {
-        if (streamIDs.size == 8) 
+
+    public void Play(boolean loop) {
+        if (streamIDs.size == 8)
             streamIDs.pop();
         ALSource soundSource = OALSimpleAudio.sharedInstance().playBuffer(soundBuffer, loop);
         if (soundSource == null)
@@ -131,56 +131,48 @@ public class IOSSoundData extends Data
             return;
         streamIDs.insert(0, soundSource.getSourceId());
         soundID = soundSource.getSourceId();
-        
+
         soundSource.setLooping(loop);
         soundSource.setVolume(volume);
         soundSource.setPitch(pitch);
         soundSource.setPosition(x, y, z);
     }
-    
+
     @Override
-    public void Stop() 
-    {
+    public void Stop() {
         ALSource source;
-        for (int i = 0; i < streamIDs.size; i++) 
-        {
+        for (int i = 0; i < streamIDs.size; i++) {
             if ((source = GetSoundSource(streamIDs.get(i))) != null)
                 source.stop();
         }
     }
 
     @Override
-    public void Dispose() 
-    {
+    public void Dispose() {
         Stop();
         soundBuffer.dispose();
     }
-    
+
     @Override
-    public void Pause() 
-    {
+    public void Pause() {
         ALSource source;
-        for (int i = 0; i < streamIDs.size; i++) 
-        {
-            if ((source = GetSoundSource(streamIDs.get(i))) != null) 
+        for (int i = 0; i < streamIDs.size; i++) {
+            if ((source = GetSoundSource(streamIDs.get(i))) != null)
                 source.setPaused(true);
         }
     }
-    
+
     @Override
-    public void Resume() 
-    {
+    public void Resume() {
         ALSource source;
-        for (int i = 0; i < streamIDs.size; i++) 
-        {
+        for (int i = 0; i < streamIDs.size; i++) {
             if ((source = GetSoundSource(streamIDs.get(i))) != null)
                 source.setPaused(false);
         }
     }
-    
+
     @Override
-    public void SetPitch(float pitch) 
-    {
+    public void SetPitch(float pitch) {
         this.pitch = pitch;
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
@@ -188,120 +180,107 @@ public class IOSSoundData extends Data
     }
 
     @Override
-    public void SetVolume(float volume)
-    {
+    public void SetVolume(float volume) {
         this.volume = volume;
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
             source.setVolume(volume);
     }
-    
+
     @Override
-    public void SetReferenceDistance(float distance)
-    {
+    public void SetReferenceDistance(float distance) {
         throw new UnsupportedOperationException("Reference distance controls haven't been implemented yet for iOS.");
     }
-    
+
     @Override
-    public void SetRolloff(float rolloff)
-    {
+    public void SetRolloff(float rolloff) {
         throw new UnsupportedOperationException("Reference distance controls haven't been implemented yet for iOS.");
     }
-    
+
     @Override
-    public void SetX(float newX) 
-    {
+    public void SetX(float newX) {
         SetPosition(newX, y, z);
     }
 
     @Override
-    public void SetY(float newY) 
-    {
+    public void SetY(float newY) {
         SetPosition(x, newY, z);
     }
 
     @Override
-    public void SetZ(float newZ) 
-    {
+    public void SetZ(float newZ) {
         SetPosition(x, y, newZ);
     }
 
     @Override
-    public void SetPosition(float newX, float newY, float newZ) 
-    {
+    public void SetPosition(float newX, float newY, float newZ) {
         x = newX;
         y = newY;
         z = newZ;
-        
+
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
             source.setPosition(x, y, z);
     }
-    
+
     @Override
-    public void EnableDoppler()
-    {
+    public void EnableDoppler() {
         if (dopplerEnabled)
             return;
-        
+
         dopplerEnabled = true;
         SetVelocity(velocityX, velocityY, velocityZ);
     }
-    
+
     @Override
-    public void DisableDoppler()
-    {
+    public void DisableDoppler() {
         if (!dopplerEnabled)
             return;
-        
+
         dopplerEnabled = false;
-        
+
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
             source.setVelocity(0, 0, 0);
     }
-    
+
     @Override
-    public void SetVelocity(float newX, float newY, float newZ)
-    {
+    public void SetVelocity(float newX, float newY, float newZ) {
         velocityX = newX;
         velocityY = newY;
         velocityZ = newZ;
-        
+
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
             source.setVelocity(newX, newY, newZ);
     }
-    
+
     @Override
-    public void SetHorizontalPosition(float position) 
-    {
+    public void SetHorizontalPosition(float position) {
         this.pan = position;
         this.fade = 0;
-        
-        float newX = (float)Math.cos((pan - 1) * (float)Math.PI / 2);
+
+        float newX = (float) Math.cos((pan - 1) * (float) Math.PI / 2);
         float newY = 0;
-        float newZ = (float)Math.sin((pan + 1) * (float)Math.PI / 2);
-        
+        float newZ = (float) Math.sin((pan + 1) * (float) Math.PI / 2);
+
         SetPosition(newX, newY, newZ);
     }
-    
+
     @Override
-    public void SetFade(float position) 
-    {
+    public void SetFade(float position) {
         this.pan = 0;
         this.fade = position;
-        
+
         float newX = 0;
-        float newY = (float)Math.cos((pan - 1) * (float)Math.PI / 2);
-        float newZ = (float)Math.sin((pan + 1) * (float)Math.PI / 2);
-        
+        float newY = (float) Math.cos((pan - 1) * (float) Math.PI / 2);
+        float newZ = (float) Math.sin((pan + 1) * (float) Math.PI / 2);
+
         SetPosition(newX, newY, newZ);
     }
-    
+
     @Override
-    public void SetLooping(boolean looping) 
-    {
+    public void SetLooping(boolean looping) {
         this.isLooping = looping;
         ALSource source;
         if ((source = GetSoundSource(soundID)) != null)
@@ -309,152 +288,153 @@ public class IOSSoundData extends Data
     }
 
     @Override
-    public boolean IsStreaming() 
-    {
+    public boolean IsStreaming() {
         return false;
     }
 
     @Override
-    public boolean IsPlaying() 
-    {
+    public boolean IsPlaying() {
         ALSource source = GetSoundSource(soundID);
-        if (source == null)
-        {
+        if (source == null) {
             return false;
         }
-            
+
         return source.isPlaying() && !source.isPaused();
     }
 
     @Override
-    public void Update()
-    {
+    public void Update() {
         throw new RuntimeException("This audio was not set for streaming when loaded. Use LoadToStream to allow streaming the audio.");
     }
-    
+
     @Override
-    public void QueueSamples(AudioSamples_ samples)
-    {
+    public void QueueSamples(AudioSamples_ samples) {
 //        throw new RuntimeException("This audio was not set for streaming AudioSamples when loaded. Use LoadToStream(AudioSamples) to allow for sample queueing.");
-        streamSamples.insert(this.index_audio_samples, samples);
+//        streamSamples.insert(this.index_audio_samples, samples);
         this.index_audio_samples++;
     }
-    
+
     @Override
-    public void UnqueueSamples(AudioSamples_ samples)
-    {
+    public void UnqueueSamples(AudioSamples_ samples) {
         throw new RuntimeException("This audio was not set for streaming AudioSamples when loaded. Use LoadToStream(AudioSamples) to allow for sample queueing.");
     }
-    
-    private ALSource GetSoundSource(long soundId) 
-    {	
-        
-        for (ALSource source : sourcePool) 
-        {
+
+    private ALSource GetSoundSource(long soundId) {
+
+        for (ALSource source : sourcePool) {
             if (source.getSourceId() == soundId)
                 return source;
         }
         return null;
     }
-    
+
 
     /*
     A reduced implementation of the IntArray class from libGDX, using only the
     features needed for this class.
     */
-    private class StreamContainer 
-    {
-	public int[] items;
-	public int size;
-	public boolean ordered;
+    private class StreamContainer {
+        public int[] items;
+        public int size;
+        public boolean ordered;
 
-	/** Creates an ordered array with a capacity of 16. */
-	public StreamContainer () {
-		this(true, 16);
-	}
+        /**
+         * Creates an ordered array with a capacity of 16.
+         */
+        public StreamContainer() {
+            this(true, 16);
+        }
 
-	/** Creates an ordered array with the specified capacity. */
-	public StreamContainer (int capacity) {
-		this(true, capacity);
-	}
+        /**
+         * Creates an ordered array with the specified capacity.
+         */
+        public StreamContainer(int capacity) {
+            this(true, capacity);
+        }
 
-	/** @param ordered If false, methods that remove elements may change the order of other elements in the array, which avoids a
-	 *           memory copy.
-	 * @param capacity Any elements added beyond this will cause the backing array to be grown. */
-	public StreamContainer (boolean ordered, int capacity) {
-		this.ordered = ordered;
-		items = new int[capacity];
-	}
+        /**
+         * @param ordered  If false, methods that remove elements may change the order of other elements in the array, which avoids a
+         *                 memory copy.
+         * @param capacity Any elements added beyond this will cause the backing array to be grown.
+         */
+        public StreamContainer(boolean ordered, int capacity) {
+            this.ordered = ordered;
+            items = new int[capacity];
+        }
 
-	public int get (int index) {
-		if (index >= size) throw new IndexOutOfBoundsException("index can't be >= size: " + index + " >= " + size);
-		return items[index];
-	}
+        public int get(int index) {
+            if (index >= size) throw new IndexOutOfBoundsException("index can't be >= size: " + index + " >= " + size);
+            return items[index];
+        }
 
-	public void insert (int index, int value) {
-		if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
-		int[] items = this.items;
-		if (size == items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
-		if (ordered)
-			System.arraycopy(items, index, items, index + 1, size - index);
-		else
-			items[size] = items[index];
-		size++;
-		items[index] = value;
-	}
+        public void insert(int index, int value) {
+            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+            int[] items = this.items;
+            if (size == items.length) items = resize(Math.max(8, (int) (size * 1.75f)));
+            if (ordered)
+                System.arraycopy(items, index, items, index + 1, size - index);
+            else
+                items[size] = items[index];
+            size++;
+            items[index] = value;
+        }
 
-	/** Removes and returns the last item. */
-	public int pop () {
-		return items[--size];
-	}
+        /**
+         * Removes and returns the last item.
+         */
+        public int pop() {
+            return items[--size];
+        }
 
-	protected int[] resize (int newSize) {
-		int[] newItems = new int[newSize];
-		int[] items = this.items;
-		System.arraycopy(items, 0, newItems, 0, Math.min(size, newItems.length));
-		this.items = newItems;
-		return newItems;
-	}
+        protected int[] resize(int newSize) {
+            int[] newItems = new int[newSize];
+            int[] items = this.items;
+            System.arraycopy(items, 0, newItems, 0, Math.min(size, newItems.length));
+            this.items = newItems;
+            return newItems;
+        }
     }
 
     /*
      * class StreamContainerAudioSamples is designed to be a stream container for
      * AudioSamples
      */
-    private class StreamContainerAudioSamples
-    {
+    private class StreamContainerAudioSamples {
         public int size;
         public boolean ordered;
         public AudioSamples[] items;
 
-        /** Creates an ordered array with a capacity of 16. */
-        public StreamContainerAudioSamples () {
+        /**
+         * Creates an ordered array with a capacity of 16.
+         */
+        public StreamContainerAudioSamples() {
             this(true, 16);
         }
 
-        public StreamContainerAudioSamples(boolean b, int i)
-        {
+        public StreamContainerAudioSamples(boolean b, int i) {
             this.ordered = b;
             items = new AudioSamples[i];
         }
 
-        public StreamContainerAudioSamples(int i)
-        {
+        public StreamContainerAudioSamples(int i) {
             this.ordered = false;
             items = new AudioSamples[i];
         }
 
-        public void insert (int index, AudioSamples_ audioSamples) {
-            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
-            AudioSamples[] items = this.items;
-            if (size == items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
-            if (ordered)
-                System.arraycopy(items, index, items, index + 1, size - index);
-            else
-                items[size] = items[index];
-            size++;
-            items[index] = audioSamples;
-        }
+//        public void insert (int index, AudioSamples_ audioSamples) {
+//            AudioSamples audioSamplesCast = (AudioSamples) audioSamples;
+//            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+//            AudioSamples[] items = this.items;
+//            if (size == items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
+//            if (ordered)
+//                System.arraycopy(items, index, items, index + 1, size - index);
+//            else
+//                items[size] = items[index];
+//            size++;
+//            items[index] = audioSamplesCast;
+//        }
+        
+        
     }
     
     @Override

@@ -11,6 +11,8 @@ import plugins.quorum.Libraries.Sound.Desktop.WavData;
 import plugins.quorum.Libraries.Sound.Desktop.OggData;
 import plugins.quorum.Libraries.System.QuorumFile;
 
+import plugins.*;
+
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -79,7 +81,7 @@ public class AudioSamples
      */
     public quorum.Libraries.Sound.AudioSamples_ Copy()
     {
-        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = channels;
         short[] array = buffer.clone();
@@ -101,7 +103,7 @@ public class AudioSamples
             start = end;
             end = temp;
         }
-        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = channels;
         short[] array = new short[(end - start + 1) * channels];
@@ -118,7 +120,7 @@ public class AudioSamples
      */
     public quorum.Libraries.Sound.AudioSamples_ CopyChannel(int channel)
     {
-        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = 1;
         short[] array = new short[buffer.length / channels];
@@ -144,7 +146,7 @@ public class AudioSamples
             start = end;
             end = temp;
         }
-        quorum.Libraries.Sound.AudioSamples_ copy = new quorum.Libraries.Sound.AudioSamples();
+        quorum.Libraries.Sound.AudioSamples copy = new quorum.Libraries.Sound.AudioSamples();
         copy.plugin_.samplesPerSecond = samplesPerSecond;
         copy.plugin_.channels = 1;
         short[] array = new short[(end - start + 1)];
@@ -265,6 +267,11 @@ public class AudioSamples
     public short[] GetBufferShort()
     {
         return buffer;
+    }
+    
+    public int GetTestInt()
+    {
+        return 0;
     }
 
 //*          Object me_
