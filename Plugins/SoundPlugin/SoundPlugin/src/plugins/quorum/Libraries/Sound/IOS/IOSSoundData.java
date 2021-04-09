@@ -386,7 +386,7 @@ public class IOSSoundData extends Data {
             return items[--size];
         }
 
-        protected int[] resize(int newSize) {
+        public int[] resize(int newSize) {
             int[] newItems = new int[newSize];
             int[] items = this.items;
             System.arraycopy(items, 0, newItems, 0, Math.min(size, newItems.length));
@@ -394,6 +394,8 @@ public class IOSSoundData extends Data {
             return newItems;
         }
     }
+    
+    
 
     /*
      * class StreamContainerAudioSamples is designed to be a stream container for
@@ -420,19 +422,34 @@ public class IOSSoundData extends Data {
             this.ordered = false;
             items = new AudioSamples[i];
         }
+        
 
-//        public void insert (int index, AudioSamples_ audioSamples) {
-//            AudioSamples audioSamplesCast = (AudioSamples) audioSamples;
-//            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
-//            AudioSamples[] items = this.items;
-//            if (size == items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
-//            if (ordered)
-//                System.arraycopy(items, index, items, index + 1, size - index);
-//            else
-//                items[size] = items[index];
-//            size++;
-//            items[index] = audioSamplesCast;
-//        }
+    // re-implement reszie for insert function
+        
+        public void insert (int index, AudioSamples_ audioSamples) {
+            AudioSamples audioSamplesCast = (AudioSamples) audioSamples;
+            if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+            AudioSamples[] items = this.items;
+            
+            if (size == items.length) 
+                items = resize(Math.max(8, (int)(size * 1.75f)));
+            
+            if (ordered)
+                System.arraycopy(items, index, items, index + 1, size - index);
+            else
+                items[size] = items[index];
+            size++;
+            items[index] = audioSamplesCast;
+        }
+
+        private AudioSamples[] resize(int max) {
+            int newSize = 0;
+            AudioSamples[] newItems = new AudioSamples[newSize];
+            AudioSamples[] items = this.items;
+            System.arraycopy(items, 0, newItems, 0, Math.min(size, newItems.length));
+            //this.items = newItems;
+            return newItems;
+        }
         
         
     }
