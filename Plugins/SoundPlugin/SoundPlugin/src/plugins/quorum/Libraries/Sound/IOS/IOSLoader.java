@@ -75,7 +75,7 @@ public class IOSLoader implements DataLoader
         // queue up stream container -
         stream.QueueSamples(audioSamples);
 //        stream.PlayAudioSamples(audioSamples); - dont think we need to play audio here
-        return null;
+        return stream;
     }
     
 }
