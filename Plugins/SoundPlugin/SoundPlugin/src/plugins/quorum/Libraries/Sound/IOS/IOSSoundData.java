@@ -8,8 +8,10 @@ package plugins.quorum.Libraries.Sound.IOS;
 
 import java.util.Arrays;
 
+import javax.sound.sampled.DataLine;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.SourceDataLine;
+import javax.sound.sampled.AudioSystem;
 
 import org.robovm.apple.foundation.NSArray;
 import plugins.quorum.Libraries.Sound.AudioSamples;
@@ -23,6 +25,7 @@ import sun.audio.*;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import javax.sound.sampled.LineUnavailableException;
 
 /**
  *
@@ -49,14 +52,6 @@ public class IOSSoundData extends Data {
         sourcePool = channel.getSourcePool().getSources();
     }
 
-// *          Object me_
-// *          int MAX_SHORT
-// *          short[] buffer;
-// *          int samplesPerSecond = 44100;
-// *          int channels = 1;
-//    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
-//    OALSimpleAudio only works if an ALBuffer is passed
-
     public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ data) {
 //        int channelInt = samples.GetChannels();
 ////      channel = (ALChannelSource)channelInt;
@@ -73,7 +68,14 @@ public class IOSSoundData extends Data {
         PlayAudioSamples(data);
     }
 
-
+// *          Object me_
+// *          int MAX_SHORT
+// *          short[] buffer;
+// *          int samplesPerSecond = 44100;
+// *          int channels = 1;
+//    public IOSSoundData(quorum.Libraries.Sound.AudioSamples_ samples)
+//    OALSimpleAudio only works if an ALBuffer is passed
+    
     /*
      * function void PlayAudioSamples is to play the audio Short buffer from AudioSamples
      * parameters: AudioSample_ samples
@@ -82,38 +84,58 @@ public class IOSSoundData extends Data {
     public void PlayAudioSamples(quorum.Libraries.Sound.AudioSamples_ data) {
 //        1. convert short[] to byte[]
 //        2. read the byte array to the speakers
-
-        AudioSamples samples = (AudioSamples) data; 
-
-        // initialize audio format
-        AudioFormat format = new AudioFormat(8000.0f, 16, 1, true, true);
-        SourceDataLine speakers;
-
+        AudioSamples samples = (AudioSamples) data;
+                // initialize audio format
         int shortRead = 0;
-        int bufferSize = samples.GetTotalSize();
+        int bufferSize = 0;
         int i = 0;
 
 
-        short[] buffer; // this returns the buffer
-        buffer = samples.GetBufferShort();    // cast AudioSamples_ to AudioSamples
-
         // convert shortBuffer to byteBuffer
         bufferSize = samples.GetTotalSize();
-        short[] short_buffer_array = samples.GetBufferShort();
-        ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize * 2));  // return buffer size
-        while (bufferSize >= i) {
+        
+        SourceDataLine speakers = null;
+        try{
+            AudioFormat format = new AudioFormat(44100, 16, 1, true, true);           
+            
+            // testing integer 2 * 2 as buffer size
+            DataLine.Info info = new DataLine.Info(SourceDataLine.class, format, bufferSize*2*2);
+            
+            if(!AudioSystem.isLineSupported(info))
+            {
+                throw new LineUnavailableException();
+            }
+            
+            speakers = (SourceDataLine)AudioSystem.getLine(info);
+            speakers.open(format);
+            speakers.start();
+            
+        }catch (LineUnavailableException e) {
+                    e.printStackTrace();
+                    System.exit(-1);
+        }
+
+        // so short is larger than byte
+        short[] short_buffer_array = samples.GetBufferShort();      
+        ByteBuffer byte_buffer = ByteBuffer.allocate((bufferSize*2));  // return buffer size
+        while (i < bufferSize) {
+            byte_buffer.clear();
             byte_buffer.putShort(short_buffer_array[i]);
+            
             i++;
         }
 
         byte[] byte_buffer_array = new byte[bufferSize * 2];
         byte_buffer_array = byte_buffer.array();
         // finished converting
-
+        speakers.write(byte_buffer_array, 0, byte_buffer.position());
+        
+        speakers.drain();
+        speakers.close();
         // read audio from the byte array using sun.audio package
-        AudioData audioData = new AudioData(byte_buffer_array);
-        AudioDataStream audioStream = new AudioDataStream(audioData);
-        AudioPlayer.player.start(audioStream);
+//        AudioData audioData = new AudioData(byte_buffer_array);
+//        AudioDataStream audioStream = new AudioDataStream(audioData);
+//        AudioPlayer.player.start(audioStream);
     }
 
     @Override

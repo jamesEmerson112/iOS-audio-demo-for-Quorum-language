@@ -5,6 +5,7 @@
  */
 package plugins.quorum.Libraries.Sound;
 
+
 import plugins.quorum.Libraries.Sound.Desktop.WavInputStream;
 import plugins.quorum.Libraries.Sound.Desktop.OggInputStream;
 import plugins.quorum.Libraries.Sound.Desktop.WavData;
@@ -64,15 +65,47 @@ import java.nio.ShortBuffer;
  */
 public class AudioSamples
 {
+    
+    public Object me_ = null;
+
+
+    public static final int MAX_SHORT = java.lang.Short.MAX_VALUE;
+    public short[] buffer;
+    public int samplesPerSecond = 44100;
+    public int channels = 1;
+    
+//    Audio audio = new Audio();
     static
     {
-        // Ensure OpenAL is initialized by loading dummy audio.
+//         Ensure OpenAL is initialized by loading dummy audio.
+//        throw new UnsupportedOperationException("testing");
         Audio audio = new Audio();
         quorum.Libraries.Sound.AudioSamples_ samples = new quorum.Libraries.Sound.AudioSamples();
         samples.SetTotalSize(0);
-        audio.Load(samples);
-        audio.Dispose();
+        samples.SetChannels(0);
+        samples.SetSizeInSeconds(0);
+        
+//        throw new UnsupportedOperationException("before load");
+//        Audio.Load(samples);
+//        throw new UnsupportedOperationException("after load");
+//        audio.Dispose();
     }
+    
+        /**
+     * legacy code
+     * Unclear what me_ does
+     */
+
+//    {
+//     System.out.println("testing");
+//     Audio audio = new Audio();
+//     quorum.Libraries.Sound.AudioSamples_ samples = new quorum.Libraries.Sound.AudioSamples();
+//     samples.SetTotalSize(0);
+////     throw new UnsupportedOperationException("before load");
+//     audio.Load(samples);
+////     throw new UnsupportedOperationException("after load");
+//     audio.Dispose();
+//     }
 
     /**
      * function copy is a constructor for AudioSamples_
@@ -159,17 +192,6 @@ public class AudioSamples
         return copy;
     }
 
-    /**
-     * legacy code
-     * Unclear what me_ does
-     */
-    public Object me_ = null;
-
-
-    public static final int MAX_SHORT = java.lang.Short.MAX_VALUE;
-    public short[] buffer;
-    public int samplesPerSecond = 44100;
-    public int channels = 1;
 
     /**
      * function SetChannels sets the channel to the class AudioSamples
@@ -252,7 +274,10 @@ public class AudioSamples
         return buffer.length;
     }
 
-
+    public void Set(int index, double value)
+    {
+        SetBuffer(index, value, channels);
+    }
     
     public void SetBuffer(int index, double value, int channel)
     {
@@ -336,4 +361,5 @@ public class AudioSamples
         this.channels = channels;
         samplesPerSecond = sampleRate;
     }
+    
 }
