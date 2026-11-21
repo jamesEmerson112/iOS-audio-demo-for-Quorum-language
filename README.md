@@ -44,7 +44,7 @@ With Tony Amin, I replaced that refusal with a path through `IOSSoundData`, whic
 
 ## What I built
 
-**`AudioSamples` loads on iOS.** `IOSLoader.Load(AudioSamples)` used to throw. It now returns a new `IOSSoundData` built from the samples. See [`IOSLoader.java`](Plugins/SoundPlugin/SoundPlugin/src/plugins/quorum/Libraries/Sound/IOS/IOSLoader.java).
+**`IOSLoader` accepts `AudioSamples`.** `IOSLoader.Load(AudioSamples)` used to throw. It now hands the samples to a new `IOSSoundData` constructor instead. See [`IOSLoader.java`](Plugins/SoundPlugin/SoundPlugin/src/plugins/quorum/Libraries/Sound/IOS/IOSLoader.java), and [where it stood in April 2021](#where-it-stood-in-april-2021) for why this path still couldn't play sound on iOS.
 
 **From samples to an output line.** A new `IOSSoundData(AudioSamples)` constructor hands the buffer to `PlayAudioSamples`. That method is written to read the 16-bit `short[]` sample buffer, pack it into bytes, and write the bytes to an audio output line. The first version used `sun.audio` for output. The final commit switched to a `javax.sound.sampled` `SourceDataLine` at 44.1 kHz, 16-bit mono. See [`IOSSoundData.java`](Plugins/SoundPlugin/SoundPlugin/src/plugins/quorum/Libraries/Sound/IOS/IOSSoundData.java).
 
