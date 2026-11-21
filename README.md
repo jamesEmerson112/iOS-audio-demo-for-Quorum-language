@@ -63,23 +63,15 @@ With Tony Amin, I replaced that refusal with a path through `IOSSoundData`, whic
 ## How the iOS audio path works
 
 ```mermaid
-flowchart TD
-    subgraph added [Added in this research]
-        A1["Quorum program fills<br/>an AudioSamples buffer"] --> A2["Audio.Load(samples) or<br/>Audio.LoadToStream(samples)"]
-        A2 --> A3["IOSLoader"]
-        A3 -->|"Load(samples)"| A4["new IOSSoundData(samples)"]
-        A4 --> A5["PlayAudioSamples()<br/>short[] samples to 16-bit PCM bytes"]
-        A5 --> A6["Audio output line"]
-        A3 -->|"LoadToStream(samples)"| A7["IOSSoundData + QueueSamples()"]
-        A7 --> A8["StreamContainerAudioSamples<br/>queue of sample buffers"]
-    end
-    subgraph existing [Already in Quorum for sound files]
-        B1["Sound file"] --> B2["IOSLoader.Load(file)"]
-        B2 --> B3["ObjectAL<br/>OALSimpleAudio, ALBuffer, ALSource"]
-    end
+flowchart LR
+    A["Quorum program<br/>builds AudioSamples"] --> B["IOSLoader"]
+    B -- "Load" --> C["IOSSoundData<br/>PlayAudioSamples()"]
+    C --> D["16-bit PCM bytes<br/>to an output line"]
+    B -- "LoadToStream" --> E["IOSSoundData<br/>QueueSamples()"]
+    E --> F["StreamContainerAudioSamples<br/>queue of buffers"]
 ```
 
-The diagram shows the path as it was designed. The next section covers where the code actually stood.
+The diagram shows the `AudioSamples` path as it was designed. Sound files already had their own path on iOS: `IOSLoader.Load(file)` hands the file to ObjectAL through `OALSimpleAudio`, `ALBuffer` and `ALSource`. The next section covers where the code actually stood.
 
 ## Where it stood in April 2021
 
