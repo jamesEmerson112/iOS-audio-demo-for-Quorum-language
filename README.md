@@ -79,7 +79,7 @@ I remember recording audio and playing it back. I also remember a sound file pla
 
 The committed `AudioSamples` path had not yet reached working audio on iOS when the semester ended:
 
-- `PlayAudioSamples` sends its output through `javax.sound.sampled`, and earlier through `sun.audio`. Neither package is part of the RoboVM runtime that compiles Java for iOS. I checked this against its open-source fork, MobiVM.
+- `PlayAudioSamples` sends its output through `javax.sound.sampled`, and earlier through `sun.audio`. Neither package is in the Java class library of MobiVM, the open-source fork of RoboVM that compiles Java for iOS.
 - `PlayAudioSamples` calls `byte_buffer.clear()` before each `putShort`, so it writes only the last sample, two bytes, to the output line.
 - The `AudioSamples` constructor leaves `soundBuffer` and `sourcePool` as `null`, so `SetVolume`, `IsPlaying` and `Dispose` would throw a `NullPointerException` on that object.
 - `QueueSamples` counts each queued buffer, but the line that stores it in `StreamContainerAudioSamples` is commented out, and `UnqueueSamples` still throws.
@@ -159,7 +159,8 @@ My commits appear under three names: James Emerson, James Emerson (An Vo), and A
 | [`…/Sound/Android/AndroidAudioManager.java`](Plugins/SoundPlugin/SoundPlugin/src/plugins/quorum/Libraries/Sound/Android/AndroidAudioManager.java) | The Android backend, where the two Doppler calls now log. |
 | [`…/tts/impl/ClientSpeak.java`](Quorum/Library/Standard/Plugins/org/sodbeans/phonemic/tts/impl/ClientSpeak.java) | The text-to-speech client that gained console logging. |
 | `Hello.quorum`, `QuorumTomcat/dependencies/Hello.quorum` | A hello-world Quorum program added during the research. |
-| `QuorumStandardLibrary.jar`, `QuorumStandardLibrary.js`, `QuorumStandardPlugins.jar`, `jar_files/`, `Quorum/Quorum.jar` | Quorum build outputs committed during the research. |
+| `QuorumStandardLibrary.jar`, `QuorumStandardLibrary.js`, `QuorumStandardPlugins.jar`, `jar_files/` | Quorum build outputs committed during the research. |
+| `Quorum/Quorum.jar` | An older prebuilt Quorum compiler jar, built with Apple's Java 1.6, committed during the research. |
 | `.gitignore`, `.idea/` | Git and IDE settings updated during the research. |
 | Everything else | Upstream Quorum 8 as of July 2020. |
 
