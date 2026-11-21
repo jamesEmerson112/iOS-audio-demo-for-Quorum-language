@@ -172,9 +172,11 @@ Quorum is a general-purpose programming language shaped by evidence. Its team ru
 
 These are the upstream instructions from the time of this snapshot. Open Quorum Studio, open the Quorum project in the `Quorum/` folder, and build it normally. For the command line, [`Quorum/ReadMe.txt`](Quorum/ReadMe.txt) documents the compiler. For example, `java -jar Quorum.jar Hello.quorum` compiles `Hello.quorum`.
 
-## Related work
+## Related work: Fall 2020 senior project
 
-The Fall 2020 UNLV senior project [Quorum_iOS_Transpiliation](https://github.com/thenick775/Quorum_iOS_Transpiliation) re-integrated the open-source RoboVM compiler into Quorum's toolchain, using the MobiVM fork, so that Quorum applications could be compiled to iOS binaries.
+Before this research, I was on the UNLV Fall 2020 senior project team behind [Quorum_iOS_Transpiliation](https://github.com/thenick775/Quorum_iOS_Transpiliation). The project re-integrated the open-source RoboVM compiler into Quorum's toolchain, using the MobiVM fork, so that Quorum applications could be compiled to iOS binaries.
+
+My part was mostly testing. I ran tests and sent the logs to the team lead, which is why none of my work shows up as commits in that repository. I already knew the project's workflow, so I also taught it to the rest of the team.
 
 ## Credits
 
