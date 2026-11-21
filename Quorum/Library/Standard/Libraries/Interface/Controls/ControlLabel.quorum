@@ -1,0 +1,80 @@
+package Libraries.Interface.Controls
+
+use Libraries.Game.Graphics.Label
+use Libraries.Game.Graphics.Color
+use Libraries.Interface.Controls.Control
+use Libraries.Interface.Layouts.LayoutProperties
+use Libraries.Interface.Views.View2D
+use Libraries.Interface.Views.SelectionHighlightView
+
+class ControlLabel is Label
+    
+    SelectionHighlightView view = undefined
+    boolean useSelectionColor = false
+
+    on create
+        SetPositionOnBaseLine(false)
+
+        LayoutProperties properties = GetDefaultLayoutProperties()
+        Color color
+        Color selectionColor = color:CustomColor(9.0 / 255.0, 80.0/255.0, 208.0/255.0, 1)
+        Color unfocusedColor = color:CustomColor(190.0 / 255.0, 190.0 / 255.0, 228.0 / 255.0, 1)
+
+        properties:SetSelectionFontColor(color:White())
+        properties:SetFontColor(color:Black())
+        properties:SetSelectionColor(selectionColor)
+        properties:SetUnfocusedSelectionColor(unfocusedColor)
+    end
+
+    action GainedSelection
+        UseSelectionColor(true)
+        if view not= undefined
+            view:SetSelectionColor(GetSelectionColor())
+        end
+
+        parent:Control:GainedSelection()
+    end
+
+    action UnfocusedSelection
+        UseSelectionColor(false)
+        if view not= undefined
+            view:SetSelectionColor(GetUnfocusedSelectionColor())
+        end
+
+        parent:Control:GainedSelection()
+    end
+
+    action LostSelection
+        UseSelectionColor(false)
+        parent:Control:LostSelection()
+    end
+
+    private action UseSelectionColor(boolean useSelection)
+        useSelectionColor = useSelection
+        parent:Label:ResetDrawableColors()
+    end
+
+    private action GetCurrentColor returns Color
+        if useSelectionColor
+            return GetSelectionFontColor()
+        else
+            return GetFontColor()
+        end
+    end
+
+    action LoadGraphics(LayoutProperties properties)
+        parent:Label:LoadGraphics(properties)
+
+        if properties:GetView2D() not= undefined
+            SetView2D(properties:GetView2D())
+            if properties:GetView2D() is SelectionHighlightView
+                view = cast(SelectionHighlightView, properties:GetView2D())
+            end
+        elseif GetView2D() = undefined
+            SelectionHighlightView content
+            view = content
+            content:Initialize(properties:GetSelectionColor())
+            SetView2D(content)
+        end
+    end
+end

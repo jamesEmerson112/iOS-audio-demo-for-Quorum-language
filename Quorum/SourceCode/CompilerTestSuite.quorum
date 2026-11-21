@@ -1,0 +1,798 @@
+package Libraries.Language.Compile.Test
+
+use Libraries.Language.Compile.all
+use Libraries.Containers.HashTable
+use Libraries.Containers.Array
+use Libraries.Language.Compile.Parser
+use Libraries.System.File
+use Libraries.Containers.Iterator
+use Libraries.Language.Compile.Translate.JarGenerator
+use Libraries.System.StackTraceItem
+use Libraries.Compute.Math
+use Libraries.System.DateTime
+
+use Libraries.Language.Compile.Test.MatrixTester
+
+class CompilerTestSuite
+    integer total = 0
+    integer totalBytecode = 0
+    integer totalJavaScript = 0
+
+    integer bytecodePassed = 0
+    integer javaScriptPassed = 0
+    integer passed = 0
+    integer failed = 0
+    
+    boolean testBytecode = true
+    boolean testJavaScript = false
+    Library library
+  
+    CompilerProfiler summaryProfiler
+    Math math
+    ExpressionsTester expressions
+    FilesTester fileChecks
+    TypeCheckTester typeChecks
+    TypeCheckTesterGenerated typeChecksGenerated
+    ChainingTester chainingChecks
+    IfStatementTester ifStatementChecks
+    LoopsTester loopsChecks
+    ActionsTester actionsChecks
+    InheritanceTester inheritanceChecks
+    TemplatingTester templatingChecks
+    TemplatingTesterGenerated templatingChecksGenerated
+    ExceptionTester exceptionChecks
+    ArrayTester arrayChecks
+    StackTester stackChecks
+    QueueTester queueChecks
+    MathTester mathChecks
+    ListTester listChecks
+    HashTableTester hashChecks
+    SeparatedValueTester svChecks
+    DecompresserTester decompresserChecks
+    UsePackageTester useChecks
+    RandomTester randomChecks
+    TableTester tableChecks
+    BitwiseTester bitwiseChecks
+    MatrixTester matrixChecks
+    JsonTester jsonChecks
+    BigIntegerTester bigIntegerChecks
+    ByteArrayTester byteArrayChecks
+
+    on create
+        expressions:SetCompilerTestSuite(me)
+        fileChecks:SetCompilerTestSuite(me)
+        typeChecks:SetCompilerTestSuite(me)
+        typeChecksGenerated:SetCompilerTestSuite(me)
+        chainingChecks:SetCompilerTestSuite(me)
+        ifStatementChecks:SetCompilerTestSuite(me)
+        loopsChecks:SetCompilerTestSuite(me)
+        actionsChecks:SetCompilerTestSuite(me)
+        inheritanceChecks:SetCompilerTestSuite(me)
+        templatingChecks:SetCompilerTestSuite(me)
+        templatingChecksGenerated:SetCompilerTestSuite(me)
+        exceptionChecks:SetCompilerTestSuite(me)
+        arrayChecks:SetCompilerTestSuite(me)
+        stackChecks:SetCompilerTestSuite(me)
+        queueChecks:SetCompilerTestSuite(me)
+        mathChecks:SetCompilerTestSuite(me)
+        listChecks:SetCompilerTestSuite(me)
+        hashChecks:SetCompilerTestSuite(me)
+        svChecks:SetCompilerTestSuite(me)
+        decompresserChecks:SetCompilerTestSuite(me)
+        useChecks:SetCompilerTestSuite(me)
+        randomChecks:SetCompilerTestSuite(me)
+        tableChecks:SetCompilerTestSuite(me)
+        bitwiseChecks:SetCompilerTestSuite(me)
+        matrixChecks:SetCompilerTestSuite(me)
+        jsonChecks:SetCompilerTestSuite(me)
+        bigIntegerChecks:SetCompilerTestSuite(me)
+        byteArrayChecks:SetCompilerTestSuite(me)
+
+        File outputLocation
+        outputLocation:SetPath("Library/Compiled")
+        Compiler compiler
+        library:SetLocation(compiler:GetStandardLibraryFolder())
+        library:SetCachingLibraryOpcodes(true)
+        library:SetOutputFolder(outputLocation)
+        library:Scan()
+    end
+
+    action Main
+        DateTime date
+        start = date:GetEpochTime()
+        output "Starting Quorum 8.0 Test Suite"
+        output ""
+        output "Scanning Standard Library"
+        output ""
+        output "Starting Test Suite:"
+        output expressions:GetName()
+        expressions:Test()
+        output ""
+        output fileChecks:GetName()
+        fileChecks:Test()
+        output ""
+        output typeChecks:GetName()
+        typeChecks:Test()
+        output ""
+        output typeChecksGenerated:GetName()
+        typeChecksGenerated:Test()
+        output ""
+        output chainingChecks:GetName()
+        chainingChecks:Test()
+        output ""
+        output ifStatementChecks:GetName()
+        ifStatementChecks:Test()
+        output ""
+        output loopsChecks:GetName()
+        loopsChecks:Test()
+        output ""
+        output actionsChecks:GetName()
+        actionsChecks:Test()
+        output ""
+        output inheritanceChecks:GetName()
+        inheritanceChecks:Test()
+        output ""
+        output templatingChecks:GetName()
+        templatingChecks:Test()
+        output ""
+        output templatingChecksGenerated:GetName()
+        templatingChecksGenerated:Test()
+        output ""
+        output exceptionChecks:GetName()
+        exceptionChecks:Test()
+        output ""
+        output arrayChecks:GetName()
+        arrayChecks:Test()
+        output ""
+        output stackChecks:GetName()
+        stackChecks:Test()
+        output ""
+        output queueChecks:GetName()
+        queueChecks:Test()
+        output ""
+        output mathChecks:GetName()
+        mathChecks:Test()
+        output ""
+        output listChecks:GetName()
+        listChecks:Test()
+        output ""
+        output hashChecks:GetName()
+        hashChecks:Test()
+        output ""
+        output svChecks:GetName()
+        svChecks:Test()
+        output ""
+        output decompresserChecks:GetName()
+        decompresserChecks:Test()
+        output ""
+        output useChecks:GetName()
+        useChecks:Test()
+        output ""
+        output randomChecks:GetName()
+        randomChecks:Test()
+        output ""
+        output tableChecks:GetName()
+        tableChecks:Test()
+        output ""
+        output bitwiseChecks:GetName()
+        bitwiseChecks:Test()
+        output ""
+        output matrixChecks:GetName()
+        matrixChecks:Test()
+        output ""
+        output jsonChecks:GetName()
+        jsonChecks:Test()
+        output ""
+        output bigIntegerChecks:GetName()
+        bigIntegerChecks:Test()
+        output ""
+        output byteArrayChecks:GetName()
+        byteArrayChecks:Test()
+        output ""
+
+        text EOL = ""
+        EOL = EOL:GetCarriageReturn() + EOL:GetLineFeed()
+
+        DateTime date2
+        finish = date2:GetEpochTime()
+        number totalTime = finish - start
+        totalTime = totalTime / 1000.0
+        number bytecodePercentage = math:Round((bytecodePassed  * 100.0) / (totalBytecode * 1.0), 3)
+        number javaScriptPercentage = math:Round((javaScriptPassed  * 100.0) / (totalJavaScript * 1.0), 3)
+
+        output "Finished Testing in " + totalTime + " seconds."
+        output "Bytecode Tests Passed: " + bytecodePassed + " out of " + totalBytecode
+        output "Bytecode Percentage: " + bytecodePercentage + "%." + EOL
+        
+        output "JavaScript Tests Passed: " + javaScriptPassed + " out of " + totalJavaScript
+        output "JavaScript Percentage: " + javaScriptPercentage + "%." + EOL
+
+        output "Tests Passed: " + passed + " out of " + total
+
+        number percent = math:Round((passed  * 100.0) / (total * 1.0), 3) //known bug workaround. This value should be 2, not three
+        output "Total Percentage: " + percent + "%"
+
+        output "Total Profiling Data per phase:"
+        summaryProfiler:OutputSummaryTimes()
+    end
+
+    action Test(Array<File> files, Array<text> reply)
+        if testBytecode = false
+            return now
+        end
+        CompilerTestResult result
+        check
+            result = RunTestFile(files)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                Iterator<text> lineIt = lines:GetIterator()
+                integer n = lines:GetSize()
+                integer i = 0
+                result:passed = true
+                if lines:GetSize() not= reply:GetSize()
+                    result:passed = false
+                end
+                repeat n times
+                    if lines:Get(i) not= reply:Get(i)
+                       result:passed = false
+                    end
+                    i = i + 1
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:SetErrorMessage(message)
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    private action GetDefaultCompiler returns Compiler
+        Compiler defaultCompiler
+        File root
+        root:SetPath("Output")
+        defaultCompiler:SetOutputFolder(root)
+        defaultCompiler:SetOutputSpeech(false) //don't speak while in test mode
+
+        //File standardLibraryFolder = compiler:GetStandardLibraryFolder()
+        //compiler:SetStandardLibraryFolder(standardLibraryFolder)
+        return defaultCompiler
+    end
+
+    action RunTestFile (Array<File> files) returns CompilerTestResult
+        CompilerTestResult result = undefined
+        Compiler compiler = GetDefaultCompiler()
+        
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:library = library
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+        File testFile 
+        testFile = files:Get(0)
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+
+        if manager:IsCompilationErrorFree()
+            File jar = compiler:GetExecutable(request)
+            result = RunClassFile(jar)
+        else
+            CompilerTestResult result2
+            result = result2
+            result:errorMessage = "Compilation had errors"
+        end
+        result:name = testFile:GetPath()
+        return result
+    end
+
+    action TestJavaScript(Array<File> files, Array<text> reply)
+        if testJavaScript = false
+            return now
+        end
+        CompilerTestResult result
+        check
+            result = RunJavaScriptTestFile(files)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                Iterator<text> lineIt = lines:GetIterator()
+                integer n = lines:GetSize()
+                integer i = 0
+                result:passed = true
+                repeat n times
+                    if lines:Get(i) not= reply:Get(i)
+                        result:passed = false
+                    end
+                    i = i + 1
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTestFile(Array<File> files) returns CompilerTestResult
+        CompilerTestResult result = undefined
+        Compiler compiler  = GetDefaultCompiler()
+        
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:library = library
+        request:SetOutputType(request:JAVASCRIPT)
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+
+        File testFile 
+        testFile = files:Get(0)
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+
+        if manager:IsCompilationErrorFree() //run the program
+            text convertedJavaScript = compilerResult:convertedJavaScript
+            result = RunJavaScript(convertedJavaScript)
+        else
+            CompilerTestResult result2
+            result = result2
+            result:errorMessage = "Compilation had errors"
+        end
+        result:name = testFile:GetPath()
+        return result
+    end
+
+    action TestFail(Array<File> files)
+        if testBytecode = false
+            return now
+        end
+        Compiler compiler = GetDefaultCompiler()
+        
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:library = library
+        request:SetOutputType(request:JAVA_BYTECODE)
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+
+        CompilerTestResult result
+        File testFile
+        testFile = files:Get(0)
+        result:name = testFile:GetPath()
+        result:isBytecodeTest = true    
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+
+        if manager:IsCompilationErrorFree()
+            result:passed = false
+            result:errorMessage = "Compilation was error free"
+        else
+            result:passed = true
+        end
+        Add(result)
+    end
+
+    action TestJavaScriptFail(Array<File> files)
+        if testJavaScript = false
+            return now
+        end
+        Compiler compiler = GetDefaultCompiler()
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:library = library
+        request:SetOutputType(request:JAVASCRIPT)
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+
+        CompilerTestResult result
+        File testFile 
+        testFile = files:Get(0)
+        result:name = testFile:GetPath()
+        result:isJavaScriptTest = true
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+
+        if manager:IsCompilationErrorFree()
+            result:passed = false
+            result:errorMessage = "Compilation was error free"
+        else
+            result:passed = true
+        end
+        Add(result)
+    end
+    
+    action Add(CompilerTestResult result)
+        if result = undefined
+            failed = failed + 1
+        elseif result:passed
+            passed = passed + 1
+        else
+            failed = failed + 1
+        end
+        total = total + 1
+        text value = ""
+        value = result:name 
+
+        if result:isBytecodeTest
+            totalBytecode = totalBytecode + 1
+            value = value + " (Bytecode)"
+            if result:passed
+                bytecodePassed = bytecodePassed + 1
+            end
+        end
+
+        if result:isJavaScriptTest
+            totalJavaScript = totalJavaScript + 1
+            value = value + " (JavaScript)"
+            if result:passed
+                javaScriptPassed = javaScriptPassed + 1
+            end
+        end
+
+        if result:exceptionThrown
+            value = value + " ... " + "failed"
+        elseif result:exceptionThrown and result:passed = false
+            text error = result:errorMessage
+            value = value + " ... " + "failed: exception thrown with message: " + error
+            Array<StackTraceItem> stack = result:stackTrace
+            if stack not= undefined
+                if not stack:IsEmpty()
+                    StackTraceItem item = stack:Get(0)
+                    value = value + ", " + item:GetClassName() + ":" + item:GetMethodName() + ":" + item:GetLineNumber()
+                end
+            end
+        elseif not result:exceptionThrown and result:passed = false
+            if result:errorMessage not= ""
+                value = value + "... fail: " + result:errorMessage
+            else
+                value = value + "... fail: Incorrect output."
+            end
+        else
+            value = value + " ... " + "passed"
+        end
+        output value
+    end
+
+    action RunTestFail(text source) returns CompilerTestResult
+        CompilerTestResult result = undefined
+            //use TestFail instead
+        return result
+    end
+
+    action RunJavaScriptTestFail(text source) returns CompilerTestResult
+        CompilerTestResult result = undefined
+            //use TestJavaScriptFail instead
+        return result
+    end
+
+    system action RunClassFile(File file) returns CompilerTestResult
+    system action RunJavaScript(text script) returns CompilerTestResult
+
+    action RunTest(text source) returns CompilerTestResult
+        CompilerTestResult result = undefined
+        Compiler compiler = GetDefaultCompiler()
+        
+        File file
+        file:SetPath(source)
+
+        Array<File> files
+        files:Add(file)
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:library = library
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+        
+        if manager:IsCompilationErrorFree()
+            File jar = compiler:GetExecutable(request)
+            result = RunClassFile(jar)
+        else
+            CompilerTestResult result2
+            result = result2
+            result:errorMessage = "compilation had errors"
+        end
+        result:name = source
+        return result
+    end
+
+    action RunTest(text source, text reply)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 1
+                    if lines:Get(0) = reply
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    action RunTest(text source, text reply1, text reply2)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 2
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2
+                       result:passed = true
+                    end
+                end
+            end
+            
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    action RunTest(text source, text reply1, text reply2, text reply3)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 3
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3
+                       result:passed = true
+                    end
+                end
+            end
+            
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    action RunTest(text source, text reply1, text reply2, text reply3, text reply4)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 4
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3 and
+                       lines:Get(3) = reply4
+                       result:passed = true
+                    end
+                end
+            end
+            
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    action RunTest(text source, text reply1, text reply2, text reply3, text reply4, text reply5)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 5
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3 and
+                       lines:Get(3) = reply4 and
+                       lines:Get(4) = reply5
+                       result:passed = true
+                    end
+                end
+            end
+            
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isBytecodeTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTest(text source) returns CompilerTestResult
+        CompilerTestResult result = undefined
+        text quote = ""
+        quote = quote:GetDoubleQuote()
+        Compiler compiler = GetDefaultCompiler()
+        
+        File file
+        file:SetPath(source)
+
+        Array<File> files
+        files:Add(file)
+
+        CompilerRequest request
+        request:main = files:Get(0)
+        request:isWebRequest = false
+        request:SetOutputType(request:JAVASCRIPT)
+        request:library = library
+        request:files = files
+
+        CompilerResult compilerResult = compiler:Compile(request)
+        CompilerErrorManager manager = compilerResult:compilerErrorManager
+
+        CompilerProfiler profiler = compiler:GetCompilerProfiler()
+        summaryProfiler:Add(profiler)
+
+        if manager:IsCompilationErrorFree() //run the program
+            text convertedJavaScript = compilerResult:convertedJavaScript
+            result = RunJavaScript(convertedJavaScript)
+        else
+            CompilerTestResult result2
+            result = result2
+            result:errorMessage = "compilation had errors"
+        end
+        result:name = source
+        return result
+    end
+
+    action RunJavaScriptTest(text source, text reply)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunJavaScriptTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 1
+                    if lines:Get(0) = reply
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTest(text source, text reply1, text reply2)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunJavaScriptTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 2
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTest(text source, text reply1, text reply2, text reply3)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunJavaScriptTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 3
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTest(text source, text reply1, text reply2, text reply3, text reply4)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunJavaScriptTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 4
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3 and
+                       lines:Get(3) = reply4
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+    action RunJavaScriptTest(text source, text reply1, text reply2, text reply3, text reply4, text reply5)
+        CompilerTestResult result
+        result:name = source
+        check
+            result = RunJavaScriptTest(result:name)
+            if result:ranWithoutError
+                Array<text> lines = result:lines
+                if lines:GetSize() = 5
+                    if lines:Get(0) = reply1 and 
+                       lines:Get(1) = reply2 and
+                       lines:Get(2) = reply3 and
+                       lines:Get(3) = reply4 and
+                       lines:Get(4) = reply5
+                       result:passed = true
+                    end
+                end
+            end
+        detect e
+            text message = e:GetErrorMessage()
+            result:errorMessage = message
+            result:stackTrace = e:GetStackTrace()
+        end
+        result:isJavaScriptTest = true
+        Add(result)
+    end
+
+end

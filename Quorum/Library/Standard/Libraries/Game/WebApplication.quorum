@@ -1,0 +1,58 @@
+package Libraries.Game
+
+use Libraries.Game.Application
+use Libraries.Game.Game
+use Libraries.Game.WebConfiguration
+use Libraries.Interface.AccessibilityManager
+use Libraries.Game.GameStateManager
+
+class WebApplication is Application
+    
+    /*
+    Sets up the application and starts the main application loop.
+    */
+    action Setup(Game game)
+        GameStateManager manager
+        // The code below initializes accessibility for the web.
+        // As it's not yet finished, it's commented out for now.
+        /*
+        if manager:GetOperatingSystem():Contains("Web Browser")
+            output "Initializing Web accessibility."
+            AccessibilityManager accessibility
+            game:SetAccessibilityManager(accessibility)
+        else
+            output "Didn't initialize Web accessibility."
+        end
+        */
+        parent:Application:Setup(game)
+        SetGame(game)
+
+        SetupNative()
+    end
+
+    private system action SetGame(Game game)
+
+    /*
+    Sets the WebConfiguration to be used by the application during the main
+    loop.
+    */
+    system action SetConfiguration(WebConfiguration config)
+
+    /*
+    Returns the WebConfiguration in use by the application.
+    */
+    system action GetConfiguration returns WebConfiguration
+
+    /*
+    Sets the fpsInterval, lastTime, and currentTime values, then starts the main
+    loop (in JavaScript).
+    */
+    private system action SetupNative
+
+    /*
+    This action tells the game to close at the end of the next iteration of
+    the main loop. It is called automatically by the Game class's Exit action.
+    */
+    system action Exit
+
+end

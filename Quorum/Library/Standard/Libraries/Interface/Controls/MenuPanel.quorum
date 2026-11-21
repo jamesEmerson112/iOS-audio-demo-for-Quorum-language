@@ -1,0 +1,18 @@
+package Libraries.Interface.Controls
+
+use Libraries.Interface.Layouts.VerticalMenuLayout
+
+class MenuPanel is MenuPanelBlueprint
+    
+    on create
+        SetName("Menu Panel")
+
+        VerticalMenuLayout panelLayout
+        SetLayout(panelLayout)
+    end
+
+    action IsScrollable returns boolean
+        return false
+    end
+
+end

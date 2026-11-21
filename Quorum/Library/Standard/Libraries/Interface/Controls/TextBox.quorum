@@ -1,0 +1,3415 @@
+package Libraries.Interface.Controls
+
+use Libraries.Interface.Item2D
+use Libraries.Game.GameStateManager
+use Libraries.Game.Graphics.Drawable
+use Libraries.Game.Graphics.Color
+use Libraries.Game.Graphics.ColorGroup
+use Libraries.Game.Graphics.Font
+use Libraries.Game.Graphics.Texture
+use Libraries.Game.Graphics.Glyph
+use Libraries.Interface.Events.MouseEvent
+use Libraries.Interface.Events.MouseListener
+use Libraries.Interface.Events.MouseMovementListener
+use Libraries.Interface.Events.MouseWheelListener
+use Libraries.Interface.Events.FocusListener
+use Libraries.Interface.Events.FocusEvent
+use Libraries.Interface.Events.TextChangeEvent
+use Libraries.Interface.Events.TextChangeListener
+use Libraries.Interface.Layouts.ManualLayout
+use Libraries.Interface.Layouts.LayoutProperties
+use Libraries.Interface.Selections.TextBoxSelection
+use Libraries.Interface.Views.DrawableView
+use Libraries.Containers.Array
+use Libraries.Containers.MultipleLineText
+use Libraries.Containers.HashTable
+use Libraries.Containers.Support.Pair
+use Libraries.System.File
+use Libraries.Compute.Math
+use Libraries.Interface.Undo.TextBoxEditManager
+use Libraries.Interface.Undo.EditManager
+use Libraries.Interface.Undo.TextBoxEdit
+use Libraries.Interface.Undo.TextBoxEditState
+use Libraries.Interface.Controls.TextStyles.TextStyle
+use Libraries.Interface.Controls.TextStyles.TextHighlight
+use Libraries.Game.Game
+
+class TextBox is Control, MouseListener, MouseMovementListener, MouseWheelListener, FocusListener
+
+    /*
+    All of the text contained in this object.
+    */
+    MultipleLineText textValue
+
+    /*
+    The font used for the text. For future iterations, this will be replaced by
+    an iterable structure, along with information indicating at what line and
+    character positions the font changes.
+    */
+    Font font = undefined
+
+    /*
+    The color of characters. For future iterations, this will be replaced by an
+    iterable structure, along with information indicating at what line and
+    character positions the font changes.
+    */
+    Color characterColor
+
+    /*
+    The first line that's visible at the current position of the scroll track. A
+    non-integer value indicates that the first line is partially off of the top
+    of the screen - for example, a value of 2.6 indicates that line 2 is the
+    first visible line, where 60% of the line's height is off the top of the 
+    pane.
+    */
+    number firstLine = 0
+
+    /*
+    How close to the top of the scroll area the top of the vertical view is. A
+    value of 1.0 means the top of the vertical view is at the top of the scroll
+    area, while a value of 0.0 indicates the top of the vertical view is at the
+    very bottom of the scroll area (which is only possible in the unlikely case
+    that the height of the viewing region is 0). This is used to calculate the
+    firstLine value.
+    */
+    number verticalViewPercentage = 1.0
+
+    /*
+    The width of the scroll region, as calculated by the longest line of text.
+    A value of -1 indicates the width needs to be recalculated.
+    */
+    number scrollRegionWidth = -1
+
+    integer caretThickness = 1
+    Color caretColor = characterColor:Black()
+
+    /*
+    Whether the caret is active or not. This does not necessarily mean the caret
+    is visible at any exact moment - the caret might be non-visible even while
+    active, for example if the caret has been idle and is blinking. This boolean
+    effectively ensures that the caret is usable, i.e., the text box has focus.
+    */
+    boolean caretActive = false
+
+    number caretIdleTime = 1.0
+    number caretBlinkTime = 0.35
+    number caretMoveDelay = 0.35
+    number caretMoveTime = 0.0325
+    number caretTimer = 0
+
+    /*
+    The caret's position is known using three values:
+        caretLine, which line the caret is on.
+        caretCharacter, the character index of the caret on its particular line.
+        caretX, the actual X position of the caret, which is used for vertical movement.
+    */
+    integer caretLine = 0
+    integer caretCharacter = 0
+    number caretX = 0
+
+    GameStateManager gameStateManager
+    TextBoxSelection selection
+
+    /*
+    The color of the selection highlight.
+    */
+    ColorGroup selectionColor = undefined
+
+    /*
+    The texture used for the selection higlight. Initialized as a 1x1 white texture.
+    */
+    Texture selectionTexture = undefined
+
+    TextBoxRenderer background
+    Control horizontalBar
+    Control horizontalControl
+    Control verticalBar
+    Control verticalControl
+
+    LayoutProperties horizontalBarProperties
+    LayoutProperties horizontalControlProperties
+    LayoutProperties verticalBarProperties
+    LayoutProperties verticalControlProperties
+    
+    number scrollDistance = 3
+    integer barThickness = 20
+
+    number vertical = 1.0
+    number horizontal = 0
+
+    public constant integer VISIBLE_IF_NEEDED = 1
+    public constant integer ALWAYS_VISIBLE = 2
+    public constant integer NEVER_VISIBLE = 3
+
+    integer verticalMode = VISIBLE_IF_NEEDED
+    integer horizontalMode = VISIBLE_IF_NEEDED
+
+    integer leftCharacterPadding = 9
+    /*
+    Values used for when the control is dragged along the scroll track.
+    */
+    boolean barIsClicked = false
+    boolean verticalChanging = true
+    number clickPointOffset = 0
+    boolean moveFocusOnTab = true
+
+    /*
+    Values used for when text is being selected by dragging the mouse.
+    */
+    boolean draggingInText = false
+
+    /*
+    An array of listeners which are notified when the text in this TextBox
+    changes.
+    */
+    Array<TextChangeListener> textChangeListeners
+
+    boolean resizingScrollBars = false
+
+    /*
+    The IndentationStrategy is used while using the TAB and SHIFT-TAB commands to
+    increase or decrease indentation. The default strategy uses spaces.
+    */
+    IndentationStrategy indentation
+    EditManager editManager = undefined
+    TextBoxEditManager textEditManager
+
+    /*
+    TextStyle objects are used to indicate changes in the style of text at
+    certain points. For example, text might be a different color, size, or font.
+    
+    The "textStyles" array is sorted from lowest start index to highest start index.
+    The "styleTable" HashTable is used to associate names with styles.
+    */
+    Array<TextStyle> textStyles
+    HashTable<text, TextStyle> styleTable
+
+    Math math
+    constant number liner = math:SquareRoot(math:Logarithm(1.1))
+    /* 
+    The caret's previous position, which is set when the SHIFT key is pressed
+    and used in creating a selection following a mouse click
+    */
+    integer previousCaretPosition = 0
+
+    integer visibleStartLine = 0
+
+    boolean refreshGutters = false
+
+    on create
+        SetName("Text Box")
+        SetInputGroup("TextBox")
+        SetFocusable(true)
+        AddFocusListener(me)
+        SetClipping(true)
+        AddMouseWheelListener(me)
+        AddMouseListener(me)
+        AddMouseMovementListener(me)
+        AddTextChangeListener(textEditManager)
+        textEditManager:SetTextBox(me)
+
+//        SetSelectionType(parent:Selectable:RANGE_SELECTION)
+
+        background:SetName("TextBox Background")
+        Add(background)
+
+        textValue:DisableTextWrapping()
+
+        font = GetDefaultFont()
+
+        selection:Initialize(me, "")
+        SetAccessibilityCode(parent:Item:TEXTBOX)
+
+        ManualLayout layout
+        SetLayout(layout)
+
+        textValue:Initialize("")
+
+        LayoutProperties backgroundLayout = background:GetDefaultLayoutProperties()
+        backgroundLayout:SetPercentageWidth(1)
+        backgroundLayout:SetPercentageHeight(1)
+
+        Color color
+
+        LayoutProperties defaultProperties = GetDefaultLayoutProperties()
+        defaultProperties:SetFontColor(color:Black())
+        defaultProperties:SetFont(font)
+        defaultProperties:SetBackgroundColor(color:White())
+        defaultProperties:SetSelectionColor(color:CustomColor(0.75, 0.75, 1, 1))
+        defaultProperties:SetSelectionFontColor(color:Black())
+
+        verticalBar:SetName("Vertical Scroll Track")
+        verticalControl:SetName("Vertical Scroll Control")
+        horizontalBar:SetName("Horizontal Scroll Track")
+        horizontalControl:SetName("Horizontal Scroll Control")
+
+        ManualLayout verticalLayout
+        ManualLayout horizontalLayout
+        verticalBar:SetLayout(verticalLayout)
+        horizontalBar:SetLayout(horizontalLayout)
+
+        /*
+        By default, the vertical bar has width equal to the bar thickness, has a
+        height equal to the height of its container, and has its top right 
+        corner touching the top right corner of the container.
+        */
+        verticalBarProperties:SetPercentageX(1)
+        verticalBarProperties:SetPercentageOriginX(1)
+        verticalBarProperties:SetPercentageY(1)
+        verticalBarProperties:SetPercentageOriginY(1)
+        verticalBarProperties:SetPercentageHeight(1)
+        verticalBarProperties:SetPixelWidth(barThickness)
+
+        verticalBar:AddLayoutProperties(verticalBarProperties)
+
+        /*
+        The horizontal bar has width equal to its container's width, height
+        equal to the bar thickness, and lies along the bottom of the text box.
+        */
+        horizontalBarProperties:SetPercentageX(0)
+        horizontalBarProperties:SetPercentageY(0)
+        horizontalBarProperties:SetPercentageWidth(1)
+        horizontalBarProperties:SetPixelHeight(barThickness)
+
+        horizontalBar:AddLayoutProperties(horizontalBarProperties)
+
+        /*
+        The vertical control begins at the top of the bar, and its width fully
+        fills the bar. Its height is not set here, instead being set during
+        Resize().
+        */
+        verticalControlProperties:SetPercentageOriginY(1)
+        verticalControlProperties:SetPercentageY(1)
+        verticalControlProperties:SetPercentageX(0)
+        verticalControlProperties:SetPercentageWidth(1)
+
+        verticalControl:AddLayoutProperties(verticalControlProperties)
+
+        /*
+        The horizontal control begins at the left of the bar, and its height
+        fully fills the bar. Its width is not set here, instead being set during
+        Resize().
+        */
+        horizontalControlProperties:SetPercentageX(0)
+        horizontalControlProperties:SetPercentageY(0)
+        horizontalControlProperties:SetPercentageHeight(1)
+
+        horizontalControl:AddLayoutProperties(horizontalControlProperties)
+
+        Add(verticalBar)
+        Add(horizontalBar)
+        verticalBar:Add(verticalControl)
+        horizontalBar:Add(horizontalControl)
+
+        HideCaret()
+
+        Game game = gameStateManager:GetGame()
+        editManager = game:GetEditManager()
+    end
+
+    /*
+    The GetLeftCharacterPadding action returns how much padding has been added
+    to the TextBox in between the gutters (or the left side of the TextBox, if
+    there are no gutters) and the beginning of the text.
+
+    Attribute: Returns The amount of padding between the left side of the TextBox and the beginning of the text.
+    */
+    action GetLeftCharacterPadding returns integer
+        return leftCharacterPadding
+    end
+
+    /*
+    The SetLeftCharacterPadding action sets the amount of padding in between the
+    gutters (or the left side of the TextBox if there are no gutters) and the
+    beginning of the text.
+
+    Attribute: Parameter padding The amount of padding to place between the left side of the TextBox and the beginning of the text.
+    */
+    action SetLeftCharacterPadding(integer padding)
+        leftCharacterPadding = padding
+    end
+
+    /*
+    This action is used to load the graphical components of the Control. This is
+    handled automatically by the Game engine as needed, and most users shouldn't
+    need to use this action directly.
+    */
+    action LoadGraphics(LayoutProperties properties)
+        if selectionTexture = undefined
+            Texture texture
+            selectionTexture = texture
+            selectionTexture:LoadFilledRectangle(1, 1)
+        end
+
+        ColorGroup backgroundColor = properties:GetBackgroundColor()
+
+        if backgroundColor not= undefined
+            DrawableView backgroundView
+            backgroundView:SetName("TextBox Background View")
+            backgroundView:LoadFilledRectangle(1, 1, backgroundColor)
+            background:SetView2D(backgroundView)
+        end
+
+        Color color
+
+        DrawableView verticalBarView
+        DrawableView horizontalBarView
+        DrawableView verticalControlView
+        DrawableView horizontalControlView
+
+        verticalBarView:SetName("TextBox Vertical Bar View")
+        horizontalBarView:SetName("TextBox Horizontal Bar View")
+        verticalControlView:SetName("TextBox Vertical Control View")
+        horizontalControlView:SetName("TextBox Horizontal ControlView")
+
+        verticalBarView:LoadFilledRectangle(1, 1, color:CustomColor(0.9, 0.9, 0.9, 1))
+        horizontalBarView:LoadFilledRectangle(1, 1, color:CustomColor(0.9, 0.9, 0.9, 1))
+        verticalControlView:LoadFilledRectangle(1, 1, color:CustomColor(0.75, 0.75, 0.75, 1))
+        horizontalControlView:LoadFilledRectangle(1, 1, color:CustomColor(0.75, 0.75, 0.75, 1))
+
+        verticalBar:SetView2D(verticalBarView)
+        horizontalBar:SetView2D(horizontalBarView)
+        verticalControl:SetView2D(verticalControlView)
+        horizontalControl:SetView2D(horizontalControlView)
+
+        Color fontColor = properties:GetFontColor()
+        if fontColor = undefined
+            fontColor = color:Black()
+        end
+
+        caretColor = fontColor
+
+        ColorGroup highlightColor = properties:GetSelectionColor()
+        if highlightColor = undefined
+            highlightColor = color:CustomColor(0.75, 0.75, 1, 1)
+        end
+
+        selectionColor = highlightColor
+
+        // The font produces characters in white, which can later be set to any
+        // color in GetLineDrawables().
+        // font:SetColor(color:White())
+
+        parent:Control:LoadGraphics(properties)
+
+        GetLineDrawables()
+    end
+
+    /*
+    The Resize action is used to recalculate the size and position of Controls
+    that are being controlled by a Layout. Calling Resize on an Item2D won't
+    have a direct effect on it, but if the Item's children hierarchy contains
+    any Controls, those Controls will be resized.
+    */
+    action Resize
+        number height = GetHeight()
+        number width = GetWidth()
+        number verticalRatio = height / GetScrollRegionHeight()
+        number horizontalRatio = width / GetScrollRegionWidth()
+        boolean verticalVisible = (verticalMode = ALWAYS_VISIBLE or (verticalMode = VISIBLE_IF_NEEDED and verticalRatio < 1.0))
+        boolean horizontalVisible = (horizontalMode = ALWAYS_VISIBLE or (horizontalMode = VISIBLE_IF_NEEDED and horizontalRatio < 1.0))
+        number barHeight = height
+        number barWidth = width
+
+        if verticalVisible and horizontalVisible
+            verticalBarProperties:SetPixelHeight(-barThickness)
+            horizontalBarProperties:SetPixelWidth(-barThickness)
+            barHeight = height - barThickness
+            barWidth = width - barThickness
+            verticalRatio = barHeight / GetScrollRegionHeight()
+            horizontalRatio = barWidth / GetScrollRegionWidth()
+        else
+            verticalBarProperties:SetPixelHeight(0)
+            horizontalBarProperties:SetPixelWidth(0)
+        end
+
+        if verticalRatio > 1.0
+            verticalRatio = 1.0
+        end
+
+        if horizontalRatio > 1.0
+            horizontalRatio = 1.0
+        end
+
+        if verticalVisible
+            verticalControlProperties:SetPercentageHeight(verticalRatio)
+            verticalBar:Show()
+        else
+            verticalBar:Hide()
+        end
+
+        if horizontalVisible
+            horizontalControlProperties:SetPercentageWidth(horizontalRatio)
+            horizontalBar:Show()
+        else
+            horizontalBar:Hide()
+        end
+
+        // UpdatePaneView also calls the parent Resize action from Item2D, so
+        // layouts will properly be applied.
+        UpdatePaneView(horizontal, vertical)
+    end
+
+    private action ResizeLineDrawables
+        GetLineDrawables()
+        parent:Item2D:Resize()
+    end
+
+    /*
+    Makes everything from scratch. For initialization purposes.
+    */
+    private action GetLineDrawables
+        if selectionTexture = undefined
+            // If we don't have a selection texture, the graphics haven't been
+            // loaded yet, and we should wait until they are to create the
+            // drawables for text.
+            return now
+        end
+
+        LayoutProperties currentProperties = GetCurrentLayoutProperties()
+
+        if font:GetSize() not= cast(integer, (currentProperties:GetFontSize() * currentProperties:GetInterfaceScale()))
+            font:SetSize(cast(integer, currentProperties:GetFontSize() * currentProperties:GetInterfaceScale()))
+        end
+
+        // Ensure caret is correct size.
+        InitializeCaret()
+
+        Array<MultipleLineText> lines = textValue:GetLines()
+        text separator = textValue:GetLineSeparator()
+        integer totalLines = lines:GetSize()
+        integer lineHeight = font:GetLineHeight()
+        firstLine = totalLines - (totalLines * verticalViewPercentage)
+        integer firstLineInteger = cast(integer, firstLine)
+        
+        background:Empty()
+        background:SetLineCount(cast(integer, math:Ceiling(GetHeight() / lineHeight)))
+        background:SetStartLine(firstLineInteger)
+
+        Array<Gutter> gutters = background:GetGutters()
+        integer gutterCounter = 0
+        number gutterX = 0
+        repeat while gutterCounter < gutters:GetSize()
+            Gutter gutter = gutters:Get(gutterCounter)
+            gutter:LoadGraphics(gutter:GetDefaultLayoutProperties())
+            gutter:UpdateLines(firstLineInteger, totalLines, lineHeight)
+            gutter:SetPosition(gutterX, (firstLine - firstLineInteger) * lineHeight - lineHeight)
+            gutterX = gutterX + gutter:GetWidth()
+            gutterCounter = gutterCounter + 1
+        end
+
+        integer textIndex = 0
+
+        Array<TextStyle> stylesToApply
+
+        /*
+        While iterating over the text, many drawables are created, which are
+        custom rendered by the background.
+
+        The render order of these drawables is, from back-to-front:
+        Pre-Selection Highlights
+        Selection Drawables
+        Post-Selection Highlights
+        Text Drawables
+        */
+
+        number yPosition = GetHeight() + (firstLine - firstLineInteger) * lineHeight 
+        integer counter = firstLineInteger
+        repeat while counter < totalLines and yPosition > 0
+            yPosition = yPosition - lineHeight
+
+            number drawableY = yPosition - lineHeight / 4.0
+
+            textIndex = GetIndexOfLine(counter)
+
+            text line = lines:Get(counter):GetText()
+            integer size = line:GetSize()
+            if line:EndsWith(separator)
+                size = size - separator:GetSize()
+            end
+
+            integer characterCounter = 0
+            integer styleCounter = 0
+            number startX = -horizontal * (GetScrollRegionWidth() - (GetWidth() - GetSharedSpaceOffset())) + leftCharacterPadding + gutterX
+            number x = startX
+
+            // Calculate highlights on this line.
+            repeat while styleCounter < textStyles:GetSize()
+                TextStyle style = textStyles:Get(styleCounter)
+                TextHighlight highlight = style:GetHighlight()
+                
+                if highlight not= undefined
+                    integer styleStart = style:GetIndex()
+                    integer styleEnd = styleStart + style:GetSize()
+
+                    // If selection begins on this line.
+                    boolean onLine = styleStart >= textIndex and styleStart <= textIndex + size
+
+                    // If selection began on a previous line and continues on this line.
+                    onLine = onLine or styleStart <= textIndex and styleEnd > textIndex
+
+                    if onLine
+                        Drawable draw = undefined
+                        if highlight:IsLineHighlight()
+                            draw = highlight:GetDrawable(GetScrollRegionWidth(), lineHeight)
+                            draw:SetPosition(leftCharacterPadding, drawableY)
+                        else
+                            characterCounter = 0
+                            number width = 0
+                            x = startX
+                            repeat while characterCounter < size
+                                Glyph glyph = font:GetGlyph(line:GetCharacter(characterCounter))
+
+                                /*
+                                If we haven't reached the styled portion of the
+                                text, advance the x position that we'll place
+                                the highlight at.
+                                */
+                                if (textIndex + characterCounter < styleStart)
+                                    x = x + glyph:horizontalAdvance
+
+                                /*
+                                If we've reached the styled portion and we
+                                aren't past the end, increase the width of the
+                                eventual highlight.
+                                */
+                                elseif (textIndex + characterCounter < styleEnd)
+                                    width = width + glyph:horizontalAdvance
+                                
+                                /*
+                                If we're past the style's end point, then we're
+                                done. Exit the loop and generate the highlight.
+                                */
+                                else
+                                    characterCounter = size
+                                end
+                                characterCounter = characterCounter + 1
+                            end
+
+                            draw = highlight:GetDrawable(width, lineHeight)
+                            draw:SetPosition(x, drawableY)
+                        end
+
+                        if highlight:IsVisibleWhileSelected()
+                            background:AddPostSelectionHighlight(draw)
+                        else
+                            background:AddPreSelectionHighlight(draw)
+                        end
+                    end
+                end
+
+                styleCounter = styleCounter + 1
+            end
+
+            characterCounter = 0
+            styleCounter = 0
+            x = startX
+
+            repeat size times
+                Color fontColor = currentProperties:GetFontColor()
+                Color selectedFontColor = currentProperties:GetSelectionFontColor()
+                
+                stylesToApply:Empty()
+
+                styleCounter = 0
+                repeat while styleCounter < textStyles:GetSize()
+                    TextStyle style = textStyles:Get(styleCounter)
+                    // Because the array is sorted from lowest to highest index,
+                    // if this style's index is too large, all of the remainder
+                    // will be as well.
+                    if textIndex < style:GetIndex()
+                        styleCounter = textStyles:GetSize()
+                    elseif textIndex >= style:GetIndex() and textIndex < style:GetIndex() + style:GetSize()
+                        stylesToApply:Add(style)
+                        if style:GetColor() not= undefined
+                            fontColor = style:GetColor()
+                        end
+                        if style:GetSelectionColor() not= undefined
+                            selectedFontColor = style:GetSelectionColor()
+                        end
+                    end
+
+                    styleCounter = styleCounter + 1
+                end
+
+                Glyph glyph = font:GetGlyph(line:GetCharacter(characterCounter))
+                Drawable draw = background:GetDrawable()
+
+                if glyph:texture not= undefined
+                    draw:Load(glyph:texture)
+                else
+                    draw:SetTexture(undefined)
+                    draw:SetSize(0, 0)
+                end
+
+                // Whether or not this portion of the text has selection highlighting.
+                boolean highlighted = false
+
+                // If we're on the first line that's selected.
+                if counter = selection:GetFirstLine()
+                    // If we're also on the last line selected, the selection is limited to this line.
+                    if counter = selection:GetLastLine()
+                        if characterCounter >= selection:GetFirstLineIndex() and characterCounter < selection:GetLastLineIndex()
+                            highlighted = true
+                        end
+
+                    // The selection continues past this line. Select all characters after the start index.
+                    else
+                        if characterCounter >= selection:GetFirstLineIndex()
+                            highlighted = true
+                        end
+                    end
+                // If we satisfy this condition, there's more than one line selected,
+                // and we're on the last one. Select everything before the end index.
+                elseif counter = selection:GetLastLine()
+                    if characterCounter < selection:GetLastLineIndex()
+                        highlighted = true
+                    end
+
+                // If we satisfy this condition, we're in a line in between the first
+                // and last lines, and thus the whole line is selected.
+                elseif counter > selection:GetFirstLine() and counter < selection:GetLastLine()
+                    highlighted = true
+                end
+
+                if highlighted
+                    Drawable highlight = background:GetDrawable()
+                    highlight:SetName("TextBox Highlight")
+                    highlight:Load(selectionTexture)
+                    highlight:SetSize(glyph:horizontalAdvance, lineHeight)
+                    highlight:SetColor(selectionColor)
+
+                    highlight:SetPosition(x, drawableY)
+                    background:AddSelectionDrawable(highlight)
+                end
+
+                draw:SetPosition(x + glyph:lengthToGlyph, yPosition + glyph:heightFromBaseLine - draw:GetHeight())
+                draw:SetName("TextBox Character " + textIndex)
+                background:AddCharacter(counter, characterCounter, draw)
+
+                if highlighted
+                    draw:SetColor(selectedFontColor)
+                else
+                    draw:SetColor(fontColor)
+                end
+
+                x = x + glyph:horizontalAdvance
+                characterCounter = characterCounter + 1
+                textIndex = textIndex + 1
+            end
+
+            counter = counter + 1
+        end
+
+        PositionCaret()
+    end
+
+    private action InsertInLine(integer lineIndex, integer index, text inserted)
+        // The current text of the line. This is the "actual" text, rather than
+        // the drawables for the line (which we are updating in this action).
+        text currentLine = textValue:GetLine(lineIndex):GetText()
+
+        Array<Drawable> lineDrawables = background:GetLine(lineIndex)
+
+        // If the lineDrawables are undefined, this line isn't currently on-screen.
+        // There's nothing to change, so return now.
+        if lineDrawables = undefined
+            return now
+        end
+
+        LayoutProperties currentProperties = GetCurrentLayoutProperties()
+        Color fontColor = currentProperties:GetFontColor()
+
+        integer lineHeight = font:GetLineHeight()
+        integer firstLineInteger = cast(integer, firstLine)
+        number yPosition = GetHeight() + (firstLine - firstLineInteger) * lineHeight 
+        yPosition = yPosition - lineHeight * (lineIndex + 1 - firstLine)
+
+        number xPosition = 0
+
+        if index = 0
+            Array<Gutter> gutters = background:GetGutters()
+            number gutterX = 0
+            if gutters:IsEmpty() = false
+                Gutter lastGutter = gutters:GetFromEnd()
+                gutterX = lastGutter:GetX() + lastGutter:GetWidth()
+            end
+
+            xPosition = -horizontal * (GetScrollRegionWidth() - (GetWidth() - GetSharedSpaceOffset())) + leftCharacterPadding + gutterX
+        else
+            Glyph priorGlyph = font:GetGlyph(currentLine:GetCharacter(index - 1))
+            xPosition = lineDrawables:Get(index - 1):GetX() - priorGlyph:lengthToGlyph + priorGlyph:horizontalAdvance
+        end
+
+        integer counter = 0
+        repeat while counter < inserted:GetSize()
+            Drawable drawable = background:GetDrawable()
+
+            Glyph glyph = font:GetGlyph(inserted:GetCharacter(counter))
+
+            if glyph:texture not= undefined
+                drawable:Load(glyph:texture)
+                drawable:SetColor(fontColor)
+            else
+                drawable:SetTexture(undefined)
+                drawable:SetSize(0, 0)
+            end
+
+            drawable:SetPosition(xPosition + glyph:lengthToGlyph, yPosition + glyph:heightFromBaseLine - drawable:GetHeight())
+            background:AddCharacter(lineIndex, index + counter, drawable)
+
+            xPosition = xPosition + glyph:horizontalAdvance
+            counter = counter + 1
+        end
+
+        RepositionLineDrawables(lineIndex, index + counter)
+
+        PositionCaret()
+    end
+
+    private action DeleteInLine(integer lineIndex, integer index, integer charactersDeleted)
+        integer counter = 0
+        repeat while counter < charactersDeleted
+            background:RemoveCharacter(lineIndex, index)
+            counter = counter + 1
+        end
+
+        RepositionLineDrawables(lineIndex, index)
+
+        PositionCaret()
+    end
+
+    action GetCaretX returns number
+        Drawable caret = background:GetCaret()
+        return caret:GetX()
+    end
+
+    action GetCaretY returns number
+        Drawable caret = background:GetCaret()
+        return caret:GetY()
+    end
+
+    action GetCaretGlobalX returns number
+        Drawable caret = background:GetCaret()
+        return caret:GetGlobalX()
+    end
+
+    action GetCaretGlobalY returns number
+        Drawable caret = background:GetCaret()
+        return caret:GetGlobalY()
+    end
+
+    /*
+    This action repositions the Drawables on the given line, beginning with the
+    Drawable at the start index and then repositioning all of the following
+    Drawables to the right.
+    */
+    private action RepositionLineDrawables(integer lineIndex, integer startIndex)
+        text currentLine = textValue:GetLine(lineIndex):GetText()
+
+        Array<Drawable> lineDrawables = background:GetLine(lineIndex)
+
+        if lineDrawables = undefined or startIndex >= lineDrawables:GetSize() or startIndex >= currentLine:GetSize()
+            return now
+        end
+
+        Drawable firstToPosition = lineDrawables:Get(startIndex)
+        Glyph firstGlyph = font:GetGlyph(currentLine:GetCharacter(startIndex))
+        
+        number oldPosition = firstToPosition:GetX()
+        number xPosition = 0
+
+        if startIndex = 0
+            Array<Gutter> gutters = background:GetGutters()
+            number gutterX = 0
+            if gutters:IsEmpty() = false
+                Gutter lastGutter = gutters:GetFromEnd()
+                gutterX = lastGutter:GetX() + lastGutter:GetWidth()
+            end
+
+            xPosition = -horizontal * (GetScrollRegionWidth() - (GetWidth() - GetSharedSpaceOffset())) + leftCharacterPadding + gutterX
+        else
+            Glyph priorGlyph = font:GetGlyph(currentLine:GetCharacter(startIndex - 1))
+            xPosition = lineDrawables:Get(startIndex - 1):GetX() - priorGlyph:lengthToGlyph + priorGlyph:horizontalAdvance
+        end
+
+        firstToPosition:SetX(xPosition + firstGlyph:lengthToGlyph)
+
+        number distance = firstToPosition:GetX() - oldPosition
+
+        integer counter = startIndex + 1
+        repeat while counter < lineDrawables:GetSize()
+            lineDrawables:Get(counter):MoveX(distance)
+            counter = counter + 1
+        end
+    end
+
+    private action InitializeCaret
+        Drawable caret = background:GetCaret()
+
+        if caret:IsLoaded() = false
+            caret:LoadFilledRectangle(1, 1)
+            caret:SetName("TextBox Caret")
+        end
+
+        integer thickness = caretThickness
+        if GetCurrentLayoutProperties() not= undefined
+            thickness = cast(integer, caretThickness * GetCurrentLayoutProperties():GetInterfaceScale())
+        end
+
+        caret:SetSize(thickness, font:GetLineHeight())
+        caret:SetColor(caretColor)
+    end
+
+    /*
+    Positions the caret on the screen using the caretLine and caretCharacter
+    values. Also calculates the new x position of the caret, which is returned.
+    Depending on context, this value can be saved to overwrite the previous
+    caretX, or ignored to preserve the old value.
+    */
+    private action PositionCaret returns number
+        number lineOffset = (caretLine - firstLine + 1) * font:GetLineHeight()
+        
+        number x = 0
+        number horizontalOffset = -horizontal * (GetScrollRegionWidth() - (GetWidth() - GetSharedSpaceOffset()))
+        MultipleLineText line = textValue:GetLine(caretLine)
+        text lineCharacters = line:GetText()
+
+        integer counter = 0
+        repeat while counter < caretCharacter
+            Glyph glyph = font:GetGlyph(lineCharacters:GetCharacter(counter))
+            x = x + glyph:horizontalAdvance
+            counter = counter + 1
+        end
+
+        counter = 0
+        Array<Gutter> gutters = background:GetGutters()
+        repeat while counter < gutters:GetSize()
+            x = x + gutters:Get(counter):GetWidth()
+            counter = counter + 1
+        end
+
+        Drawable caret = background:GetCaret()
+        caret:SetPosition(x + horizontalOffset + leftCharacterPadding, GetHeight() - lineOffset - font:GetLineHeight() / 4)
+        return x + leftCharacterPadding
+    end
+
+    /*
+    The GoToLine action will adjust the vertical scroll position of the TextBox
+    to view the given line. The TextBox will try to position the line in the
+    center of the view pane.
+
+    Attribute: Parameter line The line index of the line that should be visible in the view.
+    */
+    action GoToLine(number line)
+        Array<MultipleLineText> lines = textValue:GetLines()
+        number paneHeight = GetHeight() - GetSharedSpaceOffset()
+        number viableLines = lines:GetSize() - (paneHeight / font:GetLineHeight())
+        number windowLines = (lines:GetSize() - viableLines) / 2.0
+        number newVertical = 1.0 - ((line - windowLines) / viableLines)
+        UpdatePaneView(horizontal, newVertical)
+    end
+
+    /* returns the number of lines that are currently visible in the textbox, 
+    used for pagedown and pageup behaviors */
+    action GetVisibleLines returns integer
+        return background:GetLineCount()
+    end
+    
+    action SetStartLine (integer startLine)
+        background:SetStartLine(startLine)
+    end
+
+    action GetStartLine returns integer
+        return background:GetStartLine()
+    end
+
+    private action EmptySelectionEvent(boolean textChanged)
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+
+        selection:Set(index, index, true, textChanged)
+
+        // Report the new selection here.
+        UpdateVisualSelection()
+    end
+
+    private action SelectionMoveLeft
+
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+
+        if (caretLine < selection:GetFirstLine() or caretCharacter < selection:GetFirstLineIndex())
+            integer endIndex = selection:GetEndIndex()
+            selection:Set(index, endIndex, (index = endIndex), false)
+        else
+            integer startIndex = selection:GetStartIndex()
+            selection:Set(startIndex, index, true, false)
+        end
+
+        // Report the new selection here.
+        UpdateVisualSelection()
+    end
+
+    private action SelectionMoveRight
+
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+
+        if (caretLine > selection:GetLastLine() or caretCharacter > selection:GetLastLineIndex())
+            integer startIndex = selection:GetStartIndex()
+            selection:Set(startIndex, index, true, false)
+        else
+            integer endIndex = selection:GetEndIndex()
+            selection:Set(index, endIndex, (index = endIndex), false)
+        end
+
+        // Report the new selection here.
+        UpdateVisualSelection()
+    end
+
+    private action SelectionMoveUp
+
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+
+        if (caretLine < selection:GetFirstLine() or index < selection:GetStartIndex())
+
+            integer endIndex = selection:GetEndIndex()
+
+            if index < selection:GetStartIndex() and selection:IsCaretAtEnd()
+                endIndex = selection:GetStartIndex()
+            end
+
+            selection:Set(index, endIndex, false, false)
+        else
+            selection:Set(selection:GetStartIndex(), index, true, false)
+        end
+
+        // Report the new selection here.
+        UpdateVisualSelection()
+    end
+
+    private action SelectionMoveDown
+
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+
+        if (caretLine > selection:GetLastLine())
+
+            integer startIndex = selection:GetStartIndex()
+
+            if index > selection:GetEndIndex() and (not selection:IsCaretAtEnd())
+                startIndex = selection:GetEndIndex()
+            end
+
+            selection:Set(startIndex, index, true, false)
+        else 
+            if index > selection:GetEndIndex()
+                selection:Set(selection:GetEndIndex(), index, true, false)
+            else
+                selection:Set(index, selection:GetEndIndex(), false, false)
+            end
+        end
+
+        // Report the new selection here.
+        UpdateVisualSelection()
+    end
+
+    /*
+    Update the drawables to reflect the selection.
+    */
+    private action UpdateVisualSelection
+        integer firstLine = selection:GetFirstLine()
+        integer lastLine = selection:GetLastLine()
+        integer firstLineIndex = selection:GetFirstLineIndex()
+        integer lastLineIndex = selection:GetLastLineIndex()
+        integer lineHeight = font:GetLineHeight()
+
+        background:EmptySelectionDrawables()
+
+        if firstLine = lastLine
+            if firstLineIndex = lastLineIndex
+                return now
+            end
+
+            Drawable highlight = background:GetDrawable()
+            highlight:SetName("TextBox Highlight")
+            highlight:Load(selectionTexture)
+            highlight:SetColor(selectionColor)
+
+            Array<Drawable> lineDrawables = background:GetLine(firstLine)
+            if lineDrawables = undefined
+                return now
+            end
+            text lineText = textValue:GetLine(firstLine):GetText()
+            
+            Glyph leftGlyph = font:GetGlyph(lineText:GetCharacter(firstLineIndex))
+            Glyph rightGlyph = font:GetGlyph(lineText:GetCharacter(lastLineIndex - 1))
+            Drawable leftDrawable = lineDrawables:Get(firstLineIndex)
+            number left = leftDrawable:GetX() - leftGlyph:lengthToGlyph
+            number right = lineDrawables:Get(lastLineIndex - 1):GetX() - rightGlyph:lengthToGlyph + rightGlyph:horizontalAdvance
+
+            highlight:SetSize(right - left, lineHeight)
+            highlight:SetPosition(left, leftDrawable:GetY() - leftGlyph:heightFromBaseLine + leftDrawable:GetHeight())
+
+            background:AddSelectionDrawable(highlight)
+        else
+            // For now, pass off more complex cases to the full initialization case.
+            GetLineDrawables()
+        end
+    end
+
+    /*
+    Sets the caret to a particular index. Left private because it does not
+    adjust the selection, update the visuals, or trigger any events, and is only 
+    used in preparation for other calls which will perform some tasks from the 
+    caret's position and then trigger the appropriate events.
+    */
+    private action SetCaretToIndex(integer index)
+        caretLine = textValue:LineIndexFromCharacterIndex(index)
+        caretCharacter = index - textValue:CharacterIndexFromLineIndex(caretLine)
+
+        text lineText = GetCurrentLineText()
+        text separator = textValue:GetLineSeparator()
+        integer size = lineText:GetSize()
+        if lineText:EndsWith(separator)
+            size = size - separator:GetSize()
+
+            /*
+            If the caret character exceeds the size of the line, then the caret is
+            in the middle of a multiple-character line separator. (Note that this
+            isn't possible if the separator is a single character -- if the index
+            would exceed a single-character separator, it already would've been
+            placed on the next line automatically by LineIndexFromCharacterIndex().)
+            */
+            if caretCharacter > size
+                caretLine = caretLine + 1
+                caretCharacter = 0
+            end
+        end
+    end
+
+    /*
+    The MoveCaretLeft action moves the caret one position to the left, as if the
+    user had just pressed the left arrow key. If the provided boolean is true,
+    the action will adjust the selection as the caret moves.
+
+    Attribute: Parameter selecting Whether or not the selection should be modified as the caret moves.
+    */
+    action MoveCaretLeft(boolean selecting)
+        if not caretActive
+            return now
+        end
+
+        integer oldIndex = GetCaretPosition()
+
+        if caretCharacter = 0
+            if caretLine = 0
+                if (not selecting) and (not selection:IsEmpty())
+                    EmptySelectionEvent(false)
+                end
+
+                return now
+            else
+                caretLine = caretLine - 1
+                text lineText = GetCurrentLineText()
+                text separator = textValue:GetLineSeparator()
+                caretCharacter = lineText:GetSize()
+                if lineText:EndsWith(separator)
+                    caretCharacter = caretCharacter - separator:GetSize()
+                end
+
+                if caretLine < firstLine
+                   GoToLine(caretLine)
+                end
+            end
+        else
+            caretCharacter = caretCharacter - 1
+        end
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        if selecting
+            SelectionMoveLeft()
+        else
+            TextBoxSelection select = GetSelection()
+            if not select:IsEmpty()
+                integer index = selection:GetStartIndex()
+                SetCaretPosition(index)
+            end
+            EmptySelectionEvent(false)
+        end
+    end
+
+    /*
+    The MoveCaretRight action moves the caret one position to the right, as if 
+    the user had just pressed the right arrow key. If the provided boolean is 
+    true, the action will adjust the selection as the caret moves.
+
+    Attribute: Parameter selecting Whether or not the selection should be modified as the caret moves.
+    */
+    action MoveCaretRight(boolean selecting)
+        if not caretActive
+            return now
+        end
+
+        integer oldIndex = GetCaretPosition()
+
+        text lineText = GetCurrentLineText()
+        text separator = textValue:GetLineSeparator()
+        integer size = lineText:GetSize()
+        if lineText:EndsWith(separator)
+            size = size - separator:GetSize()
+        end
+        if caretCharacter >= size
+            if caretLine + 1 = textValue:GetLineCount()
+                if (not selecting) and (not selection:IsEmpty())
+                    EmptySelectionEvent(false)
+                end
+
+                return now
+            end
+            caretLine = caretLine + 1
+            caretCharacter = 0
+
+            number visibleLines = (GetHeight() - GetSharedSpaceOffset()) / font:GetLineHeight()
+            if caretLine > (firstLine + visibleLines - 1)
+                GoToLine(caretLine - visibleLines + 1)
+            end
+        else
+            caretCharacter = caretCharacter + 1
+        end
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        if selecting
+            SelectionMoveRight()
+        else
+            TextBoxSelection select = GetSelection()
+            if not select:IsEmpty()
+                integer index = selection:GetEndIndex()
+                SetCaretPosition(index)
+            end
+            EmptySelectionEvent(false)
+        end
+    end
+
+    /*
+    Fits a character horizontally on the screen. Does not adjust vertical
+    positioning of the pane.
+    */
+    private action FitCharacterOnScreen(integer line, integer character)
+        number barSpace = 0
+        if verticalBar:IsShowing()
+            barSpace = barThickness
+        end
+
+        number left = horizontal * (GetScrollRegionWidth() - (GetWidth() - barSpace))
+        number right = left + GetWidth() - barSpace
+
+        text lineCharacters = textValue:GetLines():Get(line):GetText()
+
+        integer counter = 0
+        number x = 0
+        
+        repeat while counter < character
+            Glyph glyph = font:GetGlyph(lineCharacters:GetCharacter(counter))
+            x = x + glyph:horizontalAdvance
+            counter = counter + 1
+        end
+
+        if x < left
+            number newHorizontal = x / (GetScrollRegionWidth() - (GetWidth() - barSpace))
+            UpdatePaneView(newHorizontal, vertical)
+        else
+            if lineCharacters:GetSize() > counter
+                x = x + font:GetGlyph(lineCharacters:GetCharacter(counter)):horizontalAdvance
+            end
+            if x > right
+                number newHorizontal = (x - (GetWidth() - barSpace)) / (GetScrollRegionWidth() - (GetWidth() - barSpace))
+                UpdatePaneView(newHorizontal, vertical)
+            end
+        end
+    end
+
+    /*
+    The MoveCaretDown action moves the caret one position downward, as if the
+    user had just pressed the down arrow key. If the provided boolean is true,
+    the action will adjust the selection as the caret moves.
+
+    Attribute: Parameter selecting Whether or not the selection should be modified as the caret moves.
+    */
+    action MoveCaretDown(boolean selecting)
+        if not caretActive
+            return now
+        end
+
+        if caretLine + 1 = textValue:GetLineCount()
+            return now
+        end
+
+        integer oldIndex = GetCaretPosition()
+
+        caretLine = caretLine + 1
+        caretCharacter = GetNearestCharacter(caretLine, caretX)
+
+        number visibleLines = (GetHeight() - GetSharedSpaceOffset()) / font:GetLineHeight()
+
+        if caretLine > (firstLine + visibleLines - 1)
+            GoToLine(caretLine)
+        end
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        // Don't store the returned value from PositionCaret() - keeping the old
+        // value lets it flow more naturally across lines of varying length.
+        PositionCaret()
+        ResetCaretBlinkTimer()
+
+        if selecting
+            SelectionMoveDown()
+        else
+            EmptySelectionEvent(false)
+        end
+    end
+
+    /*
+    The MoveCaretUp action moves the caret one position upwards, as if the
+    user had just pressed the up arrow key. If the provided boolean is true,
+    the action will adjust the selection as the caret moves.
+
+    Attribute: Parameter selecting Whether or not the selection should be modified as the caret moves.
+    */
+    action MoveCaretUp(boolean selecting)
+        if not caretActive
+            return now
+        end
+
+        if caretLine = 0
+            return now
+        end
+
+        integer oldIndex = GetCaretPosition()
+
+        caretLine = caretLine - 1
+        caretCharacter = GetNearestCharacter(caretLine, caretX)
+
+        if caretLine < firstLine
+            GoToLine(caretLine)
+        end
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        // Don't store the returned value from PositionCaret() - keeping the old
+        // value lets it flow more naturally across lines of varying length.
+        PositionCaret()
+        ResetCaretBlinkTimer()
+
+        if selecting
+            SelectionMoveUp()
+        else
+            EmptySelectionEvent(false)
+        end
+    end
+
+    /*
+    For the given line, find the character index for the closest possible cursor
+    position. Used for vertical caret navigation.
+    */
+    private action GetNearestCharacter(integer line, number position) returns integer
+        text lineText = textValue:GetLine(line):GetText()
+        text separator = textValue:GetLineSeparator()
+        integer size = lineText:GetSize()
+        if lineText:EndsWith(separator)
+            size = size - separator:GetSize()
+        end
+
+        number x1 = 0
+        integer counter = 0
+        Array<Gutter> gutters = background:GetGutters()
+        repeat while counter < gutters:GetSize()
+            x1 = x1 + gutters:Get(counter):GetWidth()
+            counter = counter + 1
+        end
+        
+        x1 = x1 + leftCharacterPadding
+        number offset = -horizontal * (GetScrollRegionWidth() - (GetWidth() - GetSharedSpaceOffset()))
+        position = position - offset
+
+        if position = x1
+            return 0
+        end
+      
+        number x2 = x1
+        counter = 0
+        number distance1 = math:AbsoluteValue(position - x2)
+        repeat while counter < size
+            Glyph glyph = font:GetGlyph(lineText:GetCharacter(counter)) 
+            x2 = x1 + glyph:horizontalAdvance
+            number distance2 = math:AbsoluteValue(position - x2)
+            if distance1 < distance2
+                return counter
+            end
+            
+            distance1 = distance2
+            x1 = x2
+            counter = counter + 1
+        end
+
+        return counter
+    end
+
+    /*
+    The ShowCaret action forces the caret to display. The caret will begin to
+    blink at a rate determined by the caret's idle time (see the 
+    SetCaretIdleTime action).
+    */
+    action ShowCaret
+        caretActive = true
+        ResetCaretBlinkTimer()
+    end
+
+    private action ResetCaretBlinkTimer()
+        if caretActive
+            background:GetCaret():Show()
+            caretTimer = caretIdleTime
+        end
+    end
+
+    /*
+    The HideCaret action hides the TextBox's caret. It will not be visible until
+    the caret is displayed again as a consequence of the TextBox being modified,
+    gaining selection, or calling ShowCaret.
+    */
+    action HideCaret
+        background:GetCaret():Hide()
+        caretActive = false
+    end
+
+    /*
+    The DeleteBackward action deletes a portion of the text, as if the user had
+    just pressed the backspace key. If a portion of text is selected, the
+    selection will be deleted -- otherwise, the character immediately preceding
+    the caret will be deleted.
+    */
+    action DeleteBackward
+        if (not selection:IsEmpty())
+            TextChangeEvent changeEvent
+            changeEvent:Initialize(me, "", textValue:GetText(selection:GetStartIndex(), selection:GetEndIndex()), selection:GetStartIndex())
+            NotifyTextChangeListeners(changeEvent)
+            DeleteSelection(false)
+            return now
+        end
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+        if index = 0
+            return now
+        end
+
+        boolean shouldResize = false
+        number oldLength = GetLineWidth(caretLine)
+        integer toDelete = 1
+
+        if caretCharacter = 0
+            caretLine = caretLine - 1
+            caretCharacter = textValue:GetLine(caretLine):GetText():GetSize()
+            shouldResize = true
+            toDelete = GetLineSeparator():GetSize()
+        elseif oldLength = GetScrollRegionWidth()
+            // Force a recalculation of the width by setting its value to -1.
+            scrollRegionWidth = -1
+            shouldResize = true
+        end
+
+        text deletedText = textValue:GetText(index - toDelete, index)
+        textValue = textValue:Delete(index - toDelete, index)
+        caretCharacter = caretCharacter - toDelete
+
+        DecrementStyleIndices(GetCaretPosition(), toDelete)
+
+        if caretLine < firstLine
+            GoToLine(caretLine)
+        end
+
+        if shouldResize
+            Resize()
+        else
+            FitCharacterOnScreen(caretLine, caretCharacter)
+            DeleteInLine(caretLine, caretCharacter, toDelete)
+        end
+        
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, "", deletedText, GetCaretPosition())
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+    end
+
+    /*
+    The DeleteForward action deletes a portion of the text, as if the user had
+    just pressed the delete key. If a portion of text is selected, the
+    selection will be deleted -- otherwise, the character immediately following
+    the caret will be deleted.
+    */
+    action DeleteForward
+        if (not selection:IsEmpty())
+            DeleteSelection()
+            return now
+        end
+
+        text line = GetCurrentLineText()
+
+        if caretLine = textValue:GetLineCount() - 1
+            if caretCharacter = line:GetSize()
+                return now
+            end
+        end
+
+        integer toDelete = 1
+        text separator = GetLineSeparator()
+        integer size = line:GetSize()
+        if line:EndsWith(separator)
+            size = size - separator:GetSize()
+        end
+        if caretCharacter >= size
+            toDelete = separator:GetSize()
+        end
+
+        DecrementStyleIndices(GetCaretPosition(), toDelete)
+
+        integer index = textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+        text deletedText = textValue:GetText(index, index + toDelete)
+        textValue = textValue:Delete(index, index + toDelete)
+
+        // Force a recalculation of the width by setting its value to -1.
+        scrollRegionWidth = -1
+        Resize()
+
+        GetLineDrawables()
+        PositionCaret()
+        ResetCaretBlinkTimer()
+
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, "", deletedText, GetCaretPosition())
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+    end
+
+    /*
+    The DeleteSelection action will delete the selected text in the TextBox. If
+    the TextBox's selection is empty, this action does nothing.
+    */
+    action DeleteSelection
+        DeleteSelection(true)
+    end
+
+    private action DeleteSelection(boolean triggerTextChangeEvent)
+        if selection:IsEmpty()
+            return now
+        end
+
+        caretLine = selection:GetFirstLine()
+        caretCharacter = selection:GetFirstLineIndex()
+
+        DecrementStyleIndices(GetCaretPosition(), selection:GetEndIndex() - selection:GetStartIndex())
+
+        text deletedText = textValue:GetText(selection:GetStartIndex(), selection:GetEndIndex())
+        textValue = textValue:Delete(selection:GetStartIndex(), selection:GetEndIndex())
+
+        // Force a recalculation of the width by setting its value to -1.
+        scrollRegionWidth = -1
+        Resize()
+        FitCharacterOnScreen(caretLine, caretCharacter)
+
+        GetLineDrawables()
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        if triggerTextChangeEvent
+            TextChangeEvent changeEvent
+            changeEvent:Initialize(me, "", deletedText, selection:GetStartIndex())
+            NotifyTextChangeListeners(changeEvent)
+        end
+
+        EmptySelectionEvent(true)
+    end
+
+    /*
+    This action will delete the text between the given start and end text
+    indices. The start index is inclusive, and the end index is exclusive. In
+    other words, the character at the start index is deleted, but the character
+    at the end index is not.
+
+    Attribute: Parameter startIndex The index of the first character to delete.
+    Attribute: Parameter endIndex The end index of the stretch of text to be deleted. The character at this index is not deleted.
+    */
+    action Delete(integer startIndex, integer endIndex)
+        if startIndex = endIndex
+            return now
+        end
+
+        DecrementStyleIndices(GetCaretPosition(), endIndex - startIndex)
+
+        caretLine = textValue:LineIndexFromCharacterIndex(startIndex)
+        caretCharacter = startIndex - textValue:CharacterIndexFromLineIndex(caretLine)
+
+        text deletedText = textValue:GetText(startIndex, endIndex)
+        textValue = textValue:Delete(startIndex, endIndex)
+
+        // Force a recalculation of the width by setting its value to -1.
+        scrollRegionWidth = -1
+        Resize()
+        FitCharacterOnScreen(caretLine, caretCharacter)
+
+        GetLineDrawables()
+        PositionCaret()
+        ResetCaretBlinkTimer()
+
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, "", deletedText, startIndex)
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+    end
+
+    /*
+    This action inserts the provided text at the requested global text index.
+    This action moves the caret to the requested index before the insertion, so
+    in practice the new caret position will be immediately after the inserted
+    text.
+
+    Attribute: Parameter index The index to insert the new text at.
+    Attribute: Parameter value The new text to be inserted.
+    */
+    action Insert(integer index, text value)
+        SetCaretToIndex(index)
+        Insert(value)
+    end
+
+    /*
+    This action inserts the provided text at the requested global text index.
+    This action does not move the caret and has no otherwise visual impact.
+
+    Attribute: Parameter index The index to insert the new text at.
+    Attribute: Parameter value The new text to be inserted.
+    Attribute: Parameter moveCaret whether to move the caret
+    */
+    action Insert(integer index, text value, boolean moveCaret)
+        if moveCaret
+            Insert(index, value)
+            return now
+        end
+        value = SanitizeNewLines(value)
+        integer indexLine = GetLineIndexOfCharacter(index)
+
+        IncrementStyleIndices(index, value:GetSize())
+
+        integer caretTarget = -1
+
+        if index <= GetCaretPosition()
+            caretTarget = GetCaretPosition() + value:GetSize()
+        end
+
+        textValue = textValue:Insert(index, value)
+        
+        text separator = textValue:GetLineSeparator()
+
+        // Determine how many new lines are produced from the insert so that we
+        // know where to position the caret.
+        integer counter = 0
+        integer characters = 0
+        integer newLines = 0
+
+        //this checks all of the linefeeds and calculates how many there are.
+        integer indexToInsert = 0
+        integer searchIndex = 0
+        repeat while indexToInsert not= -1 and searchIndex < value:GetSize()
+            indexToInsert = value:IndexOf(separator, searchIndex)
+            if indexToInsert not= -1
+                newLines = newLines + 1
+                searchIndex = indexToInsert + separator:GetSize()
+            end
+        end
+
+        number lineWidth = GetLineWidth(indexLine)
+        if lineWidth > GetScrollRegionWidth()
+            // Increase scroll region width and resize bars.
+            // Setting the scroll region width to -1 forces recalculation.
+            scrollRegionWidth = -1
+            Resize()
+        end
+
+        if caretTarget >= 0
+            SetCaretPosition(caretTarget)
+        end
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        
+        if newLines = 0
+            integer indexOfLinePlacingTextOn = index - textValue:CharacterIndexFromLineIndex(indexLine)
+            InsertInLine(indexLine, indexOfLinePlacingTextOn, value)
+        else
+            GetLineDrawables()
+        end
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, value, "", index)
+
+        NotifyTextChangeListeners(changeEvent)
+    end
+
+    /*
+    This action inserts the provided text after the current caret's position.
+    After the insertion, the caret will be placed immediately following the
+    inserted text.
+
+    Attribute: Parameter value The new text to be inserted.
+    */
+    action Insert(text value)
+        value = SanitizeNewLines(value)
+
+        text deletedText = ""
+        integer originalIndex = GetCaretPosition()
+        boolean shouldDeleteSelection = (selection:IsEmpty() = false)
+
+        if shouldDeleteSelection
+            deletedText = textValue:GetText(selection:GetStartIndex(), selection:GetEndIndex())
+            DeleteSelection(false)
+        end
+
+        textValue = textValue:Insert(GetCaretPosition(), value)
+        IncrementStyleIndices(GetCaretPosition(), value:GetSize())
+        
+        text separator = textValue:GetLineSeparator()
+
+        // Determine how many new lines are produced from the insert so that we
+        // know where to position the caret.
+        integer counter = 0
+        integer characters = 0
+        integer newLines = 0
+
+        integer index = 0
+        integer searchIndex = 0
+        repeat while index not= -1 and searchIndex < value:GetSize()
+            index = value:IndexOf(separator, searchIndex)
+            if index = -1
+                characters = value:GetSize() - (searchIndex)
+            else
+                newLines = newLines + 1
+                searchIndex = index + separator:GetSize()
+            end
+        end
+
+        integer oldCaretLine = caretLine
+        integer oldCaretCharacter = caretCharacter
+
+        if newLines = 0
+            caretCharacter = caretCharacter + characters
+        else
+            caretLine = caretLine + newLines
+            caretCharacter = characters
+
+            // Resize the scroll region height and resize bars.
+            Resize()
+
+            number visibleLines = (GetHeight() - GetSharedSpaceOffset()) / font:GetLineHeight()
+            if caretLine > (firstLine + visibleLines - 1)
+                GoToLine(caretLine)
+            end
+        end
+
+        number lineWidth = GetLineWidth(caretLine)
+        if lineWidth > GetScrollRegionWidth()
+            // Increase scroll region width and resize bars.
+            // Setting the scroll region width to -1 forces recalculation.
+            scrollRegionWidth = -1
+            Resize()
+        end
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        
+        if newLines = 0
+            InsertInLine(oldCaretLine, oldCaretCharacter, value)
+        else
+            GetLineDrawables()
+        end
+
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, value, deletedText, originalIndex)
+
+        NotifyTextChangeListeners(changeEvent)
+
+        if not shouldDeleteSelection
+            EmptySelectionEvent(true)
+        end
+    end
+
+    action GetEditManager returns EditManager
+        return editManager
+    end
+
+    action SetEditManager(EditManager edits)
+        me:editManager = edits
+    end
+
+    action SetTextBoxEditManager(TextBoxEditManager manager)
+        if textEditManager not= undefined
+            RemoveTextChangeListener(textEditManager)
+        end
+        me:textEditManager = manager
+        if manager not= undefined    
+            me:textEditManager:SetTextBox(me)
+            AddTextChangeListener(textEditManager)
+        end
+    end
+
+    action GetTextBoxEditManager returns TextBoxEditManager
+        return textEditManager
+    end
+
+    action SetScrollDistance(number distance)
+        scrollDistance = distance
+    end
+
+    action GetScrollDistance returns number
+        return scrollDistance
+    end
+
+    action ScrolledMouse(MouseEvent event)
+        number y = event:scrollAmount
+        boolean positive = true
+        if y < 0
+            positive = false
+            y = y * -1
+        end
+
+        y = y + 1
+        y = math:SquareRoot(math:Logarithm(y))
+        number lines = cast(integer, y / liner)
+        if lines <= 1
+            lines = 1
+        end
+        number count = GetLineCount()
+        number linePercentage = lines / count
+
+        number heightChange = linePercentage * lines
+
+        if not positive
+            heightChange = heightChange * -1
+        end
+        y = vertical + heightChange
+        UpdatePaneView(horizontal, y)
+    end
+
+    action DraggedMouse(MouseEvent event)
+        if barIsClicked
+            // Determine if we are updating the vertical or horizontal bar.
+            if verticalChanging
+                number y = GetVerticalTrackPercentage(event:GetY() - verticalBar:GetGlobalY()) - clickPointOffset
+                UpdatePaneView(horizontal, y)
+            else
+                number x = GetHorizontalTrackPercentage(event:GetX() - horizontalBar:GetGlobalX()) - clickPointOffset
+                UpdatePaneView(x, vertical)
+            end
+        elseif draggingInText
+            MousePositionCaret(event, true)
+        end
+    end
+
+    action ClickedMouse(MouseEvent event)
+        if event:GetSource() not= undefined and event:GetSource() is Item2D
+            Item2D source = cast(Item2D, event:GetSource())
+            if source:Equals(verticalControl)
+                barIsClicked = true
+                verticalChanging = true
+                clickPointOffset = GetVerticalTrackPercentage(event:GetY() - verticalBar:GetGlobalY()) - vertical
+            elseif source:Equals(horizontalControl)
+                barIsClicked = true
+                verticalChanging = false
+                clickPointOffset = GetHorizontalTrackPercentage(event:GetX() - horizontalBar:GetGlobalX()) - horizontal
+            elseif source:Equals(verticalBar) or source:Equals(horizontalBar)
+                // React to click being on the bar itself.
+            else 
+                // Assume main text area was clicked.
+                if event:GetY() >= GetGlobalY() and event:GetY() <= GetGlobalY() + GetHeight()
+                    // See if the click should be processed by a Gutter.
+                    Array<Gutter> gutters = background:GetGutters()
+
+                    number x = event:GetX()
+                    integer counter = 0
+                    repeat while counter < gutters:GetSize()
+                        Gutter gutter = gutters:Get(counter)
+                        if x >= gutter:GetGlobalX() and x <= gutter:GetGlobalX() + gutter:GetWidth()
+                            gutter:ClickedMouse(event)
+                            return now
+                        end
+                        counter = counter + 1
+                    end
+                end
+
+                if event:mouseButton = event:LEFT
+                    draggingInText = true
+
+                    /*
+                    If the click count is 1, there's been 1 click before this 
+                    one, and we want to let the double click behavior handle it.
+                    Otherwise, we position the mouse ourselves.
+                    */
+                    if gameStateManager:GetInput():GetClickCount(me) not= 1
+                        MousePositionCaret(event, false)
+                    end
+                end
+            end
+        end
+    end
+
+    action ReleasedMouse(MouseEvent event)
+        barIsClicked = false
+        draggingInText = false
+    end
+
+    /*
+    This action positions the caret in accordance with the provided mouse event.
+    This is called internally by the system as needed, and shouldn't be called
+    directly by users.
+    */
+    action MousePositionCaret(MouseEvent event, boolean dragging)
+        
+        integer line = caretLine
+        integer index = caretCharacter
+
+        PositionCaretFromCoordinates(event:GetX() - GetGlobalX(), event:GetY() - GetGlobalY())
+        
+        if dragging
+            if line = caretLine and index = caretCharacter
+                return now
+            end
+
+            boolean atEnd = selection:IsCaretAtEnd()
+
+            if atEnd
+                if GetCaretPosition() < selection:GetStartIndex()
+                    Select(GetCaretPosition(), selection:GetStartIndex(), false)
+                else
+                    Select(selection:GetStartIndex(), GetCaretPosition(), true)
+                end
+            else
+                if GetCaretPosition() > selection:GetEndIndex()
+                    Select(selection:GetEndIndex(), GetCaretPosition(), true)
+                else
+                    Select(GetCaretPosition(), selection:GetEndIndex(), false)
+                end
+            end
+        else
+            EmptySelectionEvent(false)
+        end
+        ResetCaretBlinkTimer()
+    end
+
+    private action PositionCaretFromCoordinates(number x, number y)
+        integer totalLines = textValue:GetLines():GetSize()
+        integer lineHeight = font:GetLineHeight()
+        integer line = cast(integer, firstLine)
+        number yPosition = GetHeight() + (firstLine - line) * lineHeight - lineHeight/4
+        
+        repeat while yPosition > 0
+            yPosition = yPosition - lineHeight
+            if y > yPosition
+                if line >= totalLines
+                    line = totalLines - 1
+                end
+
+                integer index = GetNearestCharacter(line, x)
+                caretLine = line
+                caretCharacter = index
+                caretX = PositionCaret()
+                yPosition = -1
+            else
+                line = line + 1
+            end
+        end
+    end
+
+    action GainedFocus(FocusEvent event)
+        ShowCaret()
+    end
+
+    action LostFocus(FocusEvent event)
+        HideCaret()
+    end
+
+    /*
+    Takes values between 0.0 and 1.0 as percentage-style positions for the
+    vertical and horizontal scroll bars and view area.
+    */
+    action UpdatePaneView(number horizontal, number vertical)
+        if vertical > 1.0
+            if me:vertical = 1.0
+                return now
+            else
+                vertical = 1.0
+            end
+        elseif vertical < 0.0
+            if me:vertical = 0.0
+                return now
+            else
+                vertical = 0.0
+            end
+        end
+
+        if horizontal > 1.0
+            if me:horizontal = 1.0
+                return now
+            else
+                horizontal = 1.0
+            end
+        elseif horizontal < 0.0
+            if me:horizontal = 0.0
+                return now
+            else
+                horizontal = 0.0
+            end
+        end
+
+        number sharedSpaceOffset = GetSharedSpaceOffset()
+
+        verticalControlProperties:SetPercentageY(vertical)
+        verticalControlProperties:SetPixelY(((1 - vertical) * ((GetHeight() + verticalBarProperties:GetPixelHeight()) * verticalControlProperties:GetPercentageHeight())))
+        horizontalControlProperties:SetPercentageX(horizontal)
+        horizontalControlProperties:SetPixelX(-(horizontal * ((GetWidth() + horizontalBarProperties:GetPixelWidth()) * horizontalControlProperties:GetPercentageWidth())))
+
+        verticalBar:Resize()
+        horizontalBar:Resize()
+
+        number adjustedScrollWidth = GetScrollRegionWidth() - GetWidth()
+        number adjustedScrollHeight = GetScrollRegionHeight() - GetHeight()
+        
+        if verticalBar:IsShowing() and verticalBar:GetHeight() > 0
+            verticalViewPercentage = (verticalControl:GetHeight() + verticalControl:GetY()) / verticalBar:GetHeight()
+        else
+            verticalViewPercentage = 1.0
+        end
+
+        me:vertical = vertical
+        me:horizontal = horizontal
+
+        ResizeLineDrawables()
+    end
+
+    private action GetSharedSpaceOffset returns number
+        if horizontalBar:IsShowing() and verticalBar:IsShowing()
+            return barThickness
+        end
+        return 0
+    end
+
+    private action GetVerticalTrackPercentage(number y) returns number
+        return y / (GetHeight() - verticalControl:GetHeight())
+    end
+
+    private action GetHorizontalTrackPercentage(number x) returns number
+        return x / (GetWidth() - horizontalControl:GetWidth())
+    end
+
+    action GetScrollRegionHeight returns number
+        // This approach works so long as the font is universally styled (and
+        // thus all lines are the same height).
+        number height = textValue:GetLineCount() * font:GetLineHeight()// + GetSharedSpaceOffset()
+        if height > GetHeight()
+            return height
+        else
+            return GetHeight()
+        end
+    end
+
+    action GetScrollRegionWidth returns number
+        if scrollRegionWidth = -1
+            CalculateRegionWidth()
+        end
+
+        number width = GetWidth()
+        if verticalBar:IsShowing()
+            width = width - barThickness
+        end
+
+        if scrollRegionWidth > width
+            return scrollRegionWidth
+        else
+            return width
+        end
+    end
+
+    /*
+    Calculates the width of the region by finding the longest line. Potentially
+    expensive depending on how it needs to be calculated.
+    */
+    private action CalculateRegionWidth
+        /*
+        The ideal long-term solution is to have each line in the
+        MultipleLineText class maintain its width, which is updated during
+        changes. Then finding the width is O(n) for n lines. Currently that
+        class only maintains text for monospaced fonts, so we calculate from
+        that for now.
+
+        This approach only works due to the constrained conditions of the first
+        version of this TextBox:
+            - All of the text is styled with a single font.
+            - The text is monospaced. If it isn't, we attempt to err on the side
+              of too much space, rather than not enough.
+        */
+        Array<MultipleLineText> lines = textValue:GetLines()
+        
+        /*
+        For monospaced fonts, this choice is arbitrary. For non-monospaced
+        fonts, W is typically one of the broadest characters, but this is
+        imprecise at best. This approach is only meant as a short-term solution
+        to quickly calculate the width of lines. MultipleLineText will handle
+        this more elegantly in the future.
+        */
+        number glyphWidth = font:GetGlyph("W"):horizontalAdvance
+        number width = -1
+
+        integer counter = 0
+        repeat while counter < lines:GetSize()
+            number lineWidth = lines:Get(counter):GetWidth() * glyphWidth
+            if lineWidth > width
+                width = lineWidth
+            end
+            counter = counter + 1
+        end
+
+        scrollRegionWidth = width + leftCharacterPadding
+    end
+
+    private action GetLineWidth(integer index) returns number
+        
+        MultipleLineText line = textValue:GetLine(index)
+        
+        /*
+        For monospaced fonts, this choice is arbitrary. For non-monospaced
+        fonts, W is typically one of the broadest characters, but this is
+        imprecise at best. This approach is only meant as a short-term solution
+        to quickly calculate the width of lines. MultipleLineText will handle
+        this more elegantly in the future.
+        */
+        number glyphWidth = font:GetGlyph("W"):horizontalAdvance
+
+        return glyphWidth * line:GetWidth()
+    end
+
+    action SetVerticalBarVisibility(integer mode)
+        verticalMode = mode
+    end
+
+    action SetHorizontalBarVisibility(integer mode)
+        horizontalMode = mode
+    end
+
+    action Update(number seconds)
+        if caretActive
+            caretTimer = caretTimer - seconds
+            if caretTimer < 0
+                caretTimer = caretBlinkTime
+                Drawable caret = background:GetCaret()
+                if caret:IsShowing()
+                    caret:Hide()
+                else
+                    caret:Show()
+                end
+            end
+        end
+
+        if refreshGutters
+            Array<MultipleLineText> lines = textValue:GetLines()
+            Array<Gutter> gutters = background:GetGutters()
+
+            integer totalLines = lines:GetSize()
+            integer lineHeight = font:GetLineHeight()
+            integer firstLineInteger = cast(integer, firstLine)
+
+            integer counter = 0
+            repeat while counter < gutters:GetSize()
+                Gutter gutter = gutters:Get(counter)
+                gutter:LoadGraphics(gutter:GetDefaultLayoutProperties())
+                gutter:UpdateLines(firstLineInteger, totalLines, lineHeight)
+                counter = counter + 1
+            end
+
+            refreshGutters = false
+        end
+    end
+
+    action RefreshGuttersOnNextUpdate
+        refreshGutters = true
+    end
+
+    /*
+    This action sets how long it takes for the caret to cycle between visible
+    and hidden when the caret is idle. The time provided describes the number of
+    seconds it takes to transition from one stage to another -- e.g., if the 
+    provided time is one second, the caret will remain visible for one second,
+    then hide for one second, and so on.
+
+    Attribute: Parameter time The number of seconds the caret should wait before cycling between visible and hidden while idle.
+    */
+    action SetCaretIdleTime(number time)
+        caretIdleTime = time
+    end
+
+    /*
+    This action sets the number of seconds the caret should wait before
+    automatically moving when the user presses and holds a movement key.
+
+    Attribute: Parameter time The number of seconds a user must hold a movement key before the caret moves automatically.
+    */
+    action SetCaretMoveDelay(number time)
+        caretMoveDelay = time
+    end
+
+    /*
+    This action sets the number of seconds it should take for the caret to move
+    a single character when the caret is automatically moving due to the user
+    pressing and holding a movement key.
+
+    Attribute: Parameter time The number of seconds it takes for an automatically moving caret to move a single character.
+    */
+    action SetCaretMoveTime(number time)
+        caretMoveTime = time
+    end
+
+    action GetCaretIdleTime returns number
+        return caretIdleTime
+    end
+
+    action GetCaretMoveDelay returns number
+        return caretMoveDelay
+    end
+
+    action GetCaretMoveTime returns number
+        return caretMoveTime
+    end
+
+    /*
+    The SetCaretPosition action places the caret at the requested global index
+    within the text of the TextBox. Note that if the index requested would be in
+    the middle of a line separator, the caret will be placed at the end of the
+    line separator on the next line, which can cause the actual index of the
+    caret to be slightly higher.
+    */
+    action SetCaretPosition(integer index)
+        SetCaretToIndex(index)
+        caretX = PositionCaret()
+
+        EmptySelectionEvent(false)
+    end
+
+    /*
+    The SetCaretPositionToLine action sets the caret to the beginning of the
+    specified line.
+    */
+    action SetCaretPositionToLine(integer line)
+        SetCaretPosition(GetIndexOfLine(line))
+    end
+
+    /*
+    The GetCaretLine action returns the index of the line that the caret is
+    currently located on.
+    */
+    action GetCaretLine returns integer
+        return caretLine
+    end
+
+    /*
+    The GetCaretPosition action returns the global index of the caret within the
+    TextBox.
+    */
+    action GetCaretPosition returns integer
+        return textValue:CharacterIndexFromLineIndex(caretLine) + caretCharacter
+    end
+
+    /*
+    The GetCaretLinePosition action returns the index of the caret within the
+    line it is currently located. To get the global index, use GetCaretPosition
+    instead, or to get the line that the caret is on, use GetCaretLine.
+    */
+    action GetCaretLinePosition returns integer
+        return caretCharacter
+    end
+
+    /*
+    This action will return the global index of the beginning of the given line.
+    */
+    action GetIndexOfLine(integer line) returns integer
+        return textValue:CharacterIndexFromLineIndex(line)
+    end
+
+    /*
+    This action will return the line index containing the provided global index.
+    */
+    action GetLineIndexOfCharacter(integer characterIndex) returns integer
+        return textValue:LineIndexFromCharacterIndex(characterIndex)
+    end
+
+    /*
+    This action will return the number of lines in the text.
+    */
+    action GetLineCount returns integer
+        return textValue:GetLineCount()
+    end
+
+    /*
+    This action returns the total number of characters of text in the TextBox.
+    */
+    action GetSize returns integer
+        return textValue:GetSize()
+    end
+
+    action GetMultipleLineText returns MultipleLineText
+        return textValue
+    end
+
+    action GetText returns text
+        return textValue:GetText()
+    end
+
+    action GetText(integer startIndex, integer endIndex) returns text
+        return textValue:GetText(startIndex, endIndex)
+    end
+
+    action GetCurrentLineText() returns text
+        return textValue:GetLine(caretLine):GetText()
+    end
+
+    action GetLine(integer line) returns text
+        return textValue:GetLine(line):GetText()
+    end
+
+    action SetLine(integer line, text value)
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, value, GetText(), 0)
+
+        textValue = textValue:SetLine(line, value)
+        GetLineDrawables()
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        //For now we are going to assume that setting the text
+        //of a text box is not an action that needs an undo state
+        if textEditManager not= undefined
+            textEditManager:SetToIgnore(true)
+        end
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+
+        if textEditManager not= undefined
+            textEditManager:SetToIgnore(false)
+        end
+    end
+
+    action Empty
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, "", GetText(), 0)
+
+        MultipleLineText newText
+        newText:Initialize("")
+        textValue = newText
+        caretCharacter = 0
+        caretLine = 0
+
+        Resize()
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        GetLineDrawables()
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+    end
+
+    action SetText(text inputValue)
+        text value = SanitizeNewLines(inputValue)
+
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, value, GetText(), 0)
+
+        MultipleLineText newText
+        newText:Initialize(value)
+        textValue = newText
+        caretCharacter = 0
+        caretLine = 0
+
+        Resize()
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        GetLineDrawables()
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        //For now we are going to assume that setting the text
+        //of a text box is not an action that needs an undo state
+        if textEditManager not= undefined
+            textEditManager:SetToIgnore(true)
+        end
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+
+        if textEditManager not= undefined
+            textEditManager:SetToIgnore(false)
+        end
+    end
+
+    action AppendToText(text value)
+        TextChangeEvent changeEvent
+        changeEvent:Initialize(me, value, "", textValue:GetSize())
+        
+        textValue = textValue:Concatenate(value)
+
+        Resize()
+        GoToLine(textValue:GetLines():GetSize() - 1)
+
+        NotifyTextChangeListeners(changeEvent)
+        EmptySelectionEvent(true)
+    end
+
+    /*
+        This flag tells the textbox to move the focus on a tab, as opposed to 
+        doing indentation. This thus directly turns off the indentation manager.
+    */
+    action IsMoveFocusOnTab returns boolean
+        return moveFocusOnTab
+    end
+
+    /*
+        This flag tells the textbox to move the focus on a tab, as opposed to 
+        doing indentation. This thus directly turns off the indentation manager.
+    */
+    action SetMoveFocusOnTab(boolean move)
+        me:moveFocusOnTab = move
+    end
+
+    action AddIndentation
+        if moveFocusOnTab
+            Item item = GetNextFocus()
+            if item not= undefined
+                item:Focus()
+            end
+        else
+            if indentation not= undefined
+                indentation:AddIndentation(me, caretLine, caretCharacter)
+            end
+        end
+    end
+
+    action AddIndentation(integer index)
+        if moveFocusOnTab
+            Item item = GetNextFocus()
+            if item not= undefined
+                item:Focus()
+            end
+        else
+            SetCaretToIndex(index)
+            if indentation not= undefined
+                indentation:AddIndentation(me, caretLine, caretCharacter)
+            end
+        end
+    end
+
+    action RemoveIndentation
+        if moveFocusOnTab
+            Item item = GetPreviousFocus()
+            if item not= undefined
+                item:Focus()
+            end
+        else
+            if indentation not= undefined
+                indentation:RemoveIndentation(me, caretLine, caretCharacter)
+            end
+        end
+    end
+
+    action RemoveIndentation(integer index)
+        if moveFocusOnTab
+            Item item = GetPreviousFocus()
+            if item not= undefined
+                item:Focus()
+            end
+        else
+            SetCaretToIndex(index)
+            if indentation not= undefined
+                indentation:RemoveIndentation(me, caretLine, caretCharacter)
+            end
+        end
+    end
+
+    action Select(integer startIndex, integer endIndex)
+        Select(startIndex, endIndex, true)
+    end
+
+    action Select(integer startIndex, integer endIndex, boolean caretAtEnd)
+        if startIndex < 0
+            startIndex = 0
+        end
+
+        if endIndex > textValue:GetSize()
+            endIndex = textValue:GetSize()
+        end
+
+        selection:Set(startIndex, endIndex, caretAtEnd, false)
+        UpdateVisualSelection()
+    end
+
+    action GetSelection returns TextBoxSelection
+        return selection
+    end
+
+    action AddTextChangeListener(TextChangeListener listener)
+        textChangeListeners:Add(listener)
+    end
+
+    action RemoveTextChangeListener(TextChangeListener listener)
+        textChangeListeners:Remove(listener)
+    end
+
+    action GetTextChangeListeners returns Array<TextChangeListener>
+        return textChangeListeners
+    end
+
+    private action NotifyTextChangeListeners(TextChangeEvent event)
+        integer counter = 0
+        repeat while counter < textChangeListeners:GetSize()
+            textChangeListeners:Get(counter):TextChanged(event)
+            counter = counter + 1
+        end
+        gameStateManager:GetInput():NotifyTextChangeListeners(event)
+    end
+
+    action SetIndentationStrategy(IndentationStrategy strategy)
+        indentation = strategy
+    end
+
+    action GetIndentationStrategy returns IndentationStrategy
+        return indentation
+    end
+
+    /*
+    The GetLineSeparator action returns the text which is used to designate the
+    end of a line in the TextBox. By default, this is the same as the value used
+    by the operating system.
+
+    Attribute: Returns The character(s) used to designate the end of a line.
+    */
+    action GetLineSeparator returns text
+        return textValue:GetLineSeparator()
+    end
+
+    /*
+    The SetLineSeparator action sets which character(s) should be used to 
+    signify the end of a line.
+
+    Attribute: Parameter separator The character(s) to be used to mark the end of a line of text.
+    */
+    action SetLineSeparator(text separator)
+        textValue:SetLineSeparator(separator)
+    end
+
+    /*
+    The GetDefaultLineSeparator action returns the default character(s) used by
+    the TextBox to signify the end of a line of text. This is the same line
+    separating characters that are used by the running operating system.
+
+    Attribute: Returns The default characters used to indicate the end of a line of text.
+    */
+    action GetDefaultLineSeparator returns text
+        return textValue:GetDefaultLineSeparator()
+    end
+
+    action AddTextStyle(text name, TextStyle style)
+        if style = undefined
+            return now
+        end
+        integer i = 0
+        boolean inserted = false
+        
+        integer index = style:GetIndex()
+
+        repeat while i < textStyles:GetSize()
+            TextStyle temp = textStyles:Get(i)
+            if temp not= undefined and index < temp:GetIndex()
+                textStyles:Add(i, style)
+                inserted = true
+                i = textStyles:GetSize()
+            end
+            i = i + 1
+        end
+
+        if inserted = false
+            textStyles:AddToEnd(style)
+        end
+
+        if name not= ""
+            styleTable:Add(name, style)
+        end
+
+        // Request re-layout in order to recalculate dimensions of text (as the
+        // new styling might change font size) and redraw text.
+        RequestLayout()
+    end
+
+    action RemoveTextStyle(text name) returns boolean
+        if styleTable:HasKey(name)
+            TextStyle style = styleTable:RemoveKey(name)
+            textStyles:Remove(style)
+            
+            // Request re-layout in order to recalculate dimensions of text (as the
+            // new styling might change font size) and redraw text.
+            RequestLayout()
+
+            return true
+        else
+            return false
+        end
+    end
+
+    action GetTextStyle(text name) returns TextStyle
+        if styleTable:HasKey(name)
+            TextStyle style = styleTable:GetValue(name)
+            return style
+        else
+            return undefined
+        end
+    end
+
+    action HasTextStyle(text name) returns boolean
+        if styleTable:HasKey(name)
+            return true
+        else
+            return false
+        end
+    end
+
+    action RemoveTextStyle(TextStyle style) returns boolean
+        boolean hadValue = textStyles:Remove(style)
+        if hadValue = false
+            return false
+        end
+
+        styleTable:RemoveValue(style)
+
+        // Request re-layout in order to recalculate dimensions of text (as the
+        // new styling might change font size) and redraw text.
+        RequestLayout()
+
+        return true
+    end
+
+    action GetTextStylesAtIndex(integer index) returns Array<TextStyle>
+        Array<TextStyle> styles
+        integer i = 0
+        repeat while i < textStyles:GetSize()
+            TextStyle style = textStyles:Get(i)
+            if style:GetIndex() <= index and (style:GetIndex() + style:GetSize()) >= index
+                styles:Add(style)
+            elseif style:GetIndex() > index
+                /*
+                Because the TextStyles are sorted from lowest to highest start
+                index, once we've found a style with an excessive start index,
+                we know all of the remaining ones will too.
+                */
+                i = textStyles:GetSize()
+            end
+
+            i = i + 1
+        end
+
+        return styles
+    end
+
+    action GetTextStylesOnLine(integer line) returns Array<TextStyle>
+        integer startIndex = GetIndexOfLine(line)
+        integer endIndex = startIndex + GetLine(line):GetSize()
+
+        Array<TextStyle> styles
+        integer i = 0
+        repeat while i < textStyles:GetSize()
+            TextStyle style = textStyles:Get(i)
+            if style:GetIndex() <= endIndex and (style:GetIndex() + style:GetSize()) >= startIndex
+                styles:Add(style)
+            elseif style:GetIndex() > endIndex
+                /*
+                Because the TextStyles are sorted from lowest to highest start
+                index, once we've found a style with an excessive start index,
+                we know all of the remaining ones will be too.
+                */
+                i = textStyles:GetSize()
+            end
+
+            i = i + 1
+        end
+
+        return styles
+    end
+
+    action EmptyTextStyles
+        textStyles:Empty()
+        styleTable:Empty()
+
+        // Request re-layout in order to recalculate dimensions of text (as the
+        // new styling might change font size) and redraw text.
+        RequestLayout()
+    end
+    
+    /*
+    Increases the index of TextStyles by the given amount, used during insert
+    actions. For example, if three characters are added to the text, offset
+    the start index of all styles after the inserted text by 3.
+    */
+    private action IncrementStyleIndices(integer index, integer offset)
+        integer counter = 0
+        repeat while counter < textStyles:GetSize()
+            TextStyle style = textStyles:Get(counter)
+            integer styleIndex = style:GetIndex()
+            if styleIndex > index
+                style:SetIndex(styleIndex + offset)
+            elseif styleIndex <= index and styleIndex + style:GetSize() > index
+                style:SetSize(style:GetSize() + offset)
+            end
+            counter = counter + 1
+        end
+    end
+
+    /*
+    Decreases the index of TextStyles by the given amount, used during delete
+    actions. For example, if three characters are removed from the text, reduce
+    the start index of all styles after the deleted text by 3.
+    */
+    private action DecrementStyleIndices(integer index, integer offset)
+        integer counter = 0
+
+        // TextStyles that should be deleted are stored and then deleted all at
+        // once at the end of the action.
+        Array<TextStyle> toDelete
+
+        repeat while counter < textStyles:GetSize()
+            TextStyle style = textStyles:Get(counter)
+            integer styleIndex = style:GetIndex()
+            integer styleSize = style:GetSize()
+            
+            if index <= styleIndex
+                // The entire text represented by this TextStyle is being removed.
+                if index + offset > styleIndex + styleSize
+                    toDelete:Add(style)
+
+                // The deleted text is entirely before this TextStyle's contents.
+                elseif index + offset <= styleIndex
+                    style:SetIndex(styleIndex - offset)
+
+                // The deleted text is partially in this TextStyle's contents
+                // and partially outside of it.
+                else
+                    integer outer = styleIndex - index
+                    style:SetIndex(styleIndex - outer)
+                    style:SetSize(styleSize - (offset - outer))
+                end
+            elseif index > styleIndex
+                // The adjusted portion is beyond this TextStyle.
+                if index >= styleIndex + styleSize
+                    // No adjustments necessary.
+
+                // A portion of the text in this TextStyle is being removed.
+                elseif index + offset <= styleIndex + style:GetSize()
+                    style:SetSize(styleSize - offset)
+
+                // The deleted text includes the latter portion of this TextStyle's
+                // contents and text that's outside of this TextStyle.
+                else
+                    style:SetSize(index - styleIndex)
+                end
+            end
+
+            counter = counter + 1
+        end
+
+        counter = 0
+        repeat while counter < toDelete:GetSize()
+            RemoveTextStyle(toDelete:Get(counter))
+            counter = counter + 1
+        end
+    end
+
+    /*  
+    This action adds a different Item2D into this one. This makes a few things happen.
+        1. The added item will get this item as its parent.
+        2. The added item's x and y coordinates will become relative to this Item.
+        3. Most actions on this Item will also affect the added Item.
+
+    Attribute: Example
+
+        use Libraries.Interface.Item2D
+
+        Item2D parentItem
+        Item2D child
+        parentItem:Add(child)
+        
+    */
+    action Add(Item2D item)
+        if item is Gutter
+            Gutter gutter = cast(Gutter, item)
+            gutter:SetTextBox(me)
+            background:AddGutter(gutter)
+        else
+            parent:Control:Add(item)
+        end
+    end
+
+    /*  
+    This action adds a different Item2D into this one, storing the added Item2D
+    at a specific index in the internal array.
+
+    Attribute: Example
+
+        use Libraries.Interface.Item2D
+
+        Item2D parentItem
+        Item2D child
+        parentItem:Add(0, child)
+        
+    */
+    action Add(integer index, Item2D item)
+        if item is Gutter
+            Gutter gutter = cast(Gutter, item)
+            gutter:SetTextBox(me)
+            background:AddGutter(gutter)
+        else
+            parent:Control:Add(index, item)
+        end
+    end
+
+    /*  
+    This action removes an Item2D that was previously added to this Item2D. 
+
+    Attribute: Returns Whether or not the Item was found and removed.
+
+    Attribute: Example
+
+        use Libraries.Interface.Item2D
+
+        Item2D parentItem
+        Item2D child1
+        Item2D child2
+        parentItem:Add(child1)
+        parentItem:Add(child2)
+        parentItem:Remove(child1)
+    */
+    action Remove(Item2D removed) returns boolean
+        if removed is Gutter
+            Gutter gutter = cast(Gutter, removed)
+            gutter:SetTextBox(undefined)
+            return background:RemoveGutter(gutter)
+        else
+            return parent:Control:Remove(removed)
+        end
+    end
+
+    /*
+    This action returns a TextEditState object which describes the current text,
+    caret position, and selection within the TextBox.
+    */
+    action GetCurrentEditState returns TextBoxEditState
+        TextBoxEditState state
+        state:Set(textValue, GetCaretPosition(), selection)
+        return state
+    end
+
+    /*
+    This action sets the TextBox to reflect the same text, caret position, and
+    selection as described in the provided TextEditState.
+    */
+    action SetFromEditState(TextBoxEditState state)
+        textValue = state:GetMultipleLineText()
+        SetCaretToIndex(state:GetCaretPosition())
+
+        Resize()
+
+        FitCharacterOnScreen(caretLine, caretCharacter)
+        GetLineDrawables()
+        caretX = PositionCaret()
+        ResetCaretBlinkTimer()
+
+        Select(state:GetStartIndex(), state:GetEndIndex(), state:IsCaretAtEnd())
+    end
+
+    /* 
+    This action checks if the given text is using either Windows or UNIX style
+    new line separators, and if it's using a different new line style than the
+    current OS's style, swaps the new lines to the system's style.
+    */
+    private action SanitizeNewLines(text inputText) returns text
+        if inputText:IsEmpty()
+            return inputText
+        end
+
+        text separator = GetLineSeparator()
+        text outputText = inputText
+
+        text carriageReturn = separator:GetCarriageReturn()
+        text lineFeed = separator:GetLineFeed()
+
+        // If we're using Windows style separators.
+        if separator = (carriageReturn + lineFeed)
+            //QS now uses only linefeeds so this wont be needed
+            //This also doesn't check for the only carriage return case
+            integer readIndex = 0
+            integer index = outputText:IndexOf(lineFeed, readIndex)
+            repeat while index >= 0
+                if index > 0 and outputText:GetCharacter(index - 1) = carriageReturn
+                    readIndex = index + 1
+                else
+                    if index = 0
+                        outputText = carriageReturn + outputText
+                    else
+                        text preText = outputText:GetSubtext(0, index) + carriageReturn
+                        text postText = outputText:GetSubtext(index)
+                        outputText = preText + postText
+                    end
+
+                    readIndex = index + 2
+                end
+
+                if readIndex >= outputText:GetSize()
+                    index = -1
+                else
+                    index = outputText:IndexOf(lineFeed, readIndex)
+                end
+            end
+
+        // If we're using Unix style separators.
+        elseif separator = lineFeed
+            outputText = outputText:Replace(carriageReturn + lineFeed, lineFeed)
+            outputText = outputText:Replace(carriageReturn, lineFeed)
+        end
+
+        return outputText
+    end
+
+    /*
+    This action finds the start index of the first token before the caret within
+    the TextBox. If the caret is located in the middle of a token, the index
+    returned will be for that token. If the caret is exactly at the beginning of
+    a token, the start index of the previous token will be returned instead.
+
+    Attribute: Returns A global index pointing to the beginning of the first token before the caret.
+    */
+    action GetTokenStartIndex returns integer
+        return GetTokenStartIndex(GetCaretPosition())
+    end
+
+    /*
+    This action finds the start index of the first token before the given search
+    index. If the search index is located in the middle of a token, the index
+    returned will be for that token. If the search index is exactly at the
+    beginning of a token, the start index of the previous token will be returned
+    instead.
+
+    Attribute: Parameter searchIndex The global index within the text to begin the search from.
+    Attribute: Returns A global index pointing to the beginning of the first token before the search index.
+    */
+    action GetTokenStartIndex(integer searchIndex) returns integer
+        boolean tokenIsDone = false
+
+        text currentToken = ""
+        text textValue = GetText()
+        integer currentIndex = searchIndex
+        integer beginIndex = searchIndex
+        text previousCharacter = ""
+        text currentCharacter = ""
+        text carriageReturn = textValue:GetCarriageReturn()
+        text lineFeed = textValue:GetLineFeed()
+        text separator = me:textValue:GetLineSeparator()
+        
+        //windows
+        if separator = (carriageReturn + lineFeed)
+            if(0 < currentIndex)  //moving to the next line after stop at the end of the line
+                previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                if previousCharacter = previousCharacter:GetLineFeed()  
+                    currentIndex = currentIndex - 1
+                    currentToken = currentToken + currentToken:GetCarriageReturn() + 1
+                    tokenIsDone = true
+                    return beginIndex - currentToken:GetSize() 
+                end
+            end
+        else    //osx
+            if (0 < currentIndex)
+                previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                if previousCharacter = previousCharacter:GetLineFeed()
+                    currentIndex = currentIndex - 1
+                    currentToken = currentToken + currentToken:GetLineFeed()
+                    tokenIsDone = true
+                    return beginIndex - currentToken:GetSize()
+                end
+            end
+        end
+
+
+        repeat while not(tokenIsDone)
+            if 0 < currentIndex
+                previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                //"Special" single character tokens signify the beginning of the "special" token and end of the previous token
+                if(IsSpecialCharacter(previousCharacter))
+                    //The "Special" single character token is the current token
+                    if (beginIndex = currentIndex)
+                        currentToken = previousCharacter
+                        if previousCharacter = ")"
+                            if 0 < (currentIndex - 1)
+                                if textValue:GetCharacter(currentIndex - 2) = "("
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                end
+                            end
+                        end
+                        if previousCharacter = ">"
+                            if 0 < (currentIndex - 1)
+                                if textValue:GetCharacter(currentIndex - 2) = ">"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                end
+                            end
+                        end
+                        if previousCharacter= "<"
+                            if 0 < (currentIndex - 1)
+                                if textValue:GetCharacter(currentIndex - 2) = "<"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                end
+                            end
+                        end
+                        if previousCharacter = "/"
+                            if 0 < (currentIndex - 1)
+                                if textValue:GetCharacter(currentIndex - 2) = "/"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                end
+                            end
+                        end
+                    end    
+                    tokenIsDone = true
+                /* skip past white space */           
+                elseif (IsWhiteSpace(previousCharacter)) and (0 < (currentIndex - 1))   //stops the caret at the beginning of the line
+                    if ((IsEndOfLine(previousCharacter)) and (beginIndex not= currentIndex))
+                        tokenIsDone = true
+                        return beginIndex - currentToken:GetSize()
+                    end                   
+                    if currentIndex = beginIndex and (0 < currentIndex - 1)
+                        currentToken = currentToken + previousCharacter
+                        currentIndex = currentIndex - 1
+                        previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                        if(IsWhiteSpace(previousCharacter))
+                            repeat while (not(tokenIsDone)) and IsWhiteSpace(previousCharacter) and (0 < (currentIndex - 1))
+                                if ((IsEndOfLine(previousCharacter)) and (beginIndex not= currentIndex))
+                                    tokenIsDone = true
+                                    return beginIndex - currentToken:GetSize()
+                                end
+                                currentToken = currentToken + previousCharacter
+                                currentIndex = currentIndex - 1
+                                previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                            end 
+                            previousCharacter = textValue:GetCharacter(currentIndex)
+                        elseif (IsSpecialCharacter(previousCharacter))
+                            currentToken = currentToken + previousCharacter
+                            if previousCharacter = ")"
+                                if 0 < (currentIndex - 1)
+                                    if textValue:GetCharacter(currentIndex - 2) = "("
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                    end
+                                end
+                            end
+                            if previousCharacter = ">"
+                                if 0 < (currentIndex - 1)
+                                    if textValue:GetCharacter(currentIndex - 2) = ">"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                    end
+                                end
+                            end
+                            if previousCharacter= "<"
+                                if 0 < (currentIndex - 1)
+                                    if textValue:GetCharacter(currentIndex - 2) = "<"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                    end
+                                end
+                            end
+                            if previousCharacter = "/"
+                                if 0 < (currentIndex - 1)
+                                    if textValue:GetCharacter(currentIndex - 2) = "/"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex - 2)
+                                    end
+                                end
+                            end
+                            tokenIsDone = true 
+                        else
+                            previousCharacter = textValue:GetCharacter(currentIndex)
+                        end
+                    else
+                        tokenIsDone = true
+                    end
+                else
+                    currentToken = currentToken + previousCharacter
+                    currentIndex = currentIndex - 1
+                end
+            else
+                beginIndex = 0
+                currentToken = ""
+                tokenIsDone = true
+            end
+        end
+        if (beginIndex - currentToken:GetSize() >= 0)
+            return beginIndex - currentToken:GetSize()
+        else
+            return 0
+        end
+    end
+
+    private action IsBeginningOfToken(integer index) returns boolean
+        // Used by the accessibility system, which can ignore the "private" flag.
+        // It's not clear if this will be necessary in the future.
+
+        if index = 0
+            return true
+        end
+
+        text textValue = GetText()
+
+        if index >= textValue:GetSize()
+            return false
+        end
+
+        text previous = textValue:GetCharacter(index - 1)
+        text current = textValue:GetCharacter(index)
+
+        if IsWhiteSpace(current)
+            return false
+        end
+
+        if IsWhiteSpace(previous)
+            return true
+        end
+
+        if (IsSpecialCharacter(previous) and not IsSpecialCharacter(current))
+            return true
+        end
+
+        if (IsSpecialCharacter(current))
+            if current = ")"
+                if previous = "("
+                    return false
+                end
+            end
+            if current = ">"
+                if previous = ">"
+                    return false
+                end
+            end
+            if current = "<"
+                if previous = "<"
+                    return false
+                end
+            end
+            if current = "/"
+                if previous = "/"
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        return false
+    end
+
+    action GetNextTokenStartIndex returns integer
+        return GetNextTokenStartIndex(GetCaretPosition())
+    end
+
+    /*
+    This action finds the start index of the next token after the given search
+    index. If the search index is located at the start of a token, the index
+    returned will be for the start of the next token.
+
+    Attribute: Parameter searchIndex The global index within the text to begin the search from.
+    Attribute: Returns A global index pointing to the start of the next token after the search index.
+    */
+    action GetNextTokenStartIndex(integer searchIndex) returns integer
+        text textValue = GetText()
+
+        if textValue:IsEmpty()
+            return 0
+        end    
+
+        boolean inWhiteSpace = false
+        integer currentIndex = searchIndex
+
+        if currentIndex > 0 and currentIndex < textValue:GetSize()
+            if ((textValue:GetCharacter(currentIndex - 1) = " " or textValue:GetCharacter(currentIndex - 1) = textValue:GetTab()) and (textValue:GetCharacter(currentIndex) = " " or textValue:GetCharacter(currentIndex) = textValue:GetTab()))
+                inWhiteSpace = true
+            end
+        end
+        /* if we are at the beginning of the text box or in the middle of whitespace then we 
+        skip the leading whitespace and stop at the next character, rather than getting the token end Index*/
+        if currentIndex = 0 or inWhiteSpace
+            text nextCharacter = textValue:GetCharacter(currentIndex) 
+            repeat while IsWhiteSpace(nextCharacter) and ((currentIndex + 1) < textValue:GetSize())
+                currentIndex = currentIndex + 1
+                nextCharacter = textValue:GetCharacter(currentIndex)   
+            end
+            if currentIndex not= searchIndex
+                return currentIndex
+            end
+        end
+        
+        /*Get the token end index and then skip any whitespace after the end index to get the next token
+        start index*/
+        currentIndex = GetTokenEndIndex(searchIndex)
+
+        if currentIndex < textValue:GetSize() and currentIndex >= 0
+            nextCharacter = textValue:GetCharacter(currentIndex)
+            if currentIndex > 0
+                text previousCharacter = textValue:GetCharacter(currentIndex - 1)
+                if IsEndOfLine(previousCharacter)
+                    return currentIndex
+                end
+            end
+
+            if IsEndOfLine(nextCharacter)
+                return currentIndex
+            end
+
+            repeat while (IsWhiteSpace(nextCharacter)) and ((currentIndex + 1) < textValue:GetSize())
+                currentIndex = currentIndex + 1
+                nextCharacter = textValue:GetCharacter(currentIndex)
+            end
+        end
+        return currentIndex
+    end
+
+    /*
+    This action finds the end index of the first token after the caret within
+    the TextBox. If the caret is located in the middle of a token, the index
+    returned will be for that token. If the caret is exactly at the end of
+    a token, the end index of the next token will be returned instead.
+
+    Attribute: Returns A global index pointing to the end of the first token after the caret.
+    */
+    action GetTokenEndIndex returns integer
+        return GetTokenEndIndex(GetCaretPosition())
+    end
+
+    /*
+    This action finds the end index of the first token after the given search
+    index. If the search index is located in the middle of a token, the index
+    returned will be for that token. If the search index is exactly at the
+    end of a token, the end index of the next token will be returned
+    instead.
+
+    Attribute: Parameter searchIndex The global index within the text to begin the search from.
+    Attribute: Returns A global index pointing to the end of the first token after the search index.
+    */
+    action GetTokenEndIndex(integer searchIndex) returns integer
+        boolean tokenIsDone = false
+        text currentToken = ""
+        text textValue = GetText()
+        integer currentIndex = searchIndex
+        integer beginIndex = searchIndex
+        text currentCharacter = ""
+        text nextCharacter = ""
+        if textValue:IsEmpty()
+            return 0
+        end
+
+        //if the initial whitespace is a lineFeed or CarriageReturn, return the token as complete and start the next token
+        if (currentIndex) < textValue:GetSize()
+            nextCharacter = textValue:GetCharacter(currentIndex)
+            if nextCharacter = nextCharacter:GetCarriageReturn()
+                currentIndex = currentIndex + 1
+                currentToken = currentToken + nextCharacter
+                if (currentIndex < textValue:GetSize())
+                    nextCharacter = textValue:GetCharacter(currentIndex)
+                end
+                tokenIsDone = true  
+            end
+    
+            if nextCharacter = nextCharacter:GetLineFeed()
+                currentIndex = currentIndex + 1
+                currentToken = currentToken + nextCharacter
+                tokenIsDone = true
+            end
+
+            if tokenIsDone
+                return beginIndex + currentToken:GetSize()
+            end
+        end
+
+        //skipping the initial whitespace at the beginning of the line after a line feed
+        if(currentIndex > 0)    
+            text previousCharacter = textValue:GetCharacter(currentIndex - 1)
+            if IsEndOfLine(previousCharacter)
+                nextCharacter = textValue:GetCharacter(currentIndex)
+                repeat while IsWhiteSpace(nextCharacter)
+                    currentToken = currentToken + nextCharacter
+                    currentIndex = currentIndex + 1
+                    nextCharacter = textValue:GetCharacter(currentIndex)
+                end
+                if currentIndex not= beginIndex
+                    tokenIsDone = true
+                end
+            end 
+        end
+
+       repeat while not(tokenIsDone)
+            if currentIndex < textValue:GetSize()
+                nextCharacter = textValue:GetCharacter(currentIndex)               
+                //signals the end of the token  
+                if (IsSpecialCharacter(nextCharacter))
+                    if (beginIndex = currentIndex)  //check for groups of special characters
+                        currentToken = nextCharacter
+                        if nextCharacter = "("
+                            if (currentIndex + 1) < textValue:GetSize()
+                                if textValue:GetCharacter(currentIndex + 1) = ")"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                end
+                            end
+                        end
+                        if nextCharacter = "<"
+                            if (currentIndex + 1) < textValue:GetSize()
+                                if textValue:GetCharacter(currentIndex + 1) = "<"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                end
+                            end
+                        end
+                        if nextCharacter = ">"
+                            if (currentIndex + 1) < textValue:GetSize()
+                                if textValue:GetCharacter(currentIndex + 1) = ">"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                end
+                            end
+                        end
+                        if nextCharacter = "/"
+                            if (currentIndex + 1) < textValue:GetSize()
+                                if textValue:GetCharacter(currentIndex + 1) = "/"
+                                    currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                end
+                            end
+                        end
+                    end
+                        tokenIsDone = true
+                            
+                elseif (IsWhiteSpace(nextCharacter))
+                    
+                    if (IsEndOfLine(nextCharacter)) and (currentIndex not= beginIndex)
+                        tokenIsDone = true
+                    
+                    elseif currentIndex = beginIndex  and ((currentIndex + 1) < textValue:GetSize())//skip initial whitespace
+                        currentToken = currentToken + nextCharacter
+                        currentIndex = currentIndex + 1
+                        nextCharacter = textValue:GetCharacter(currentIndex)
+                        if (IsWhiteSpace(nextCharacter))
+                            repeat while IsWhiteSpace(nextCharacter) and ((currentIndex + 1) < textValue:GetSize())
+                                currentToken = currentToken + nextCharacter
+                                currentIndex = currentIndex + 1
+                                nextCharacter = textValue:GetCharacter(currentIndex)
+                            end 
+                            nextCharacter = textValue:GetCharacter(currentIndex + 1)
+                        elseif (IsSpecialCharacter(nextCharacter))
+                            currentToken = currentToken + nextCharacter
+                            if nextCharacter = "("
+                                if (currentIndex + 1) < textValue:GetSize()
+                                    if textValue:GetCharacter(currentIndex + 1) = ")"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                    end
+                                end
+                            end
+                            if nextCharacter = "<"
+                                if (currentIndex + 1) < textValue:GetSize()
+                                    if textValue:GetCharacter(currentIndex + 1) = "<"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                    end
+                                end
+                            end
+                            if nextCharacter = ">"
+                                if (currentIndex + 1) < textValue:GetSize()
+                                    if textValue:GetCharacter(currentIndex + 1) = ">"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                    end
+                                end
+                            end
+                            if nextCharacter = "/"
+                                if (currentIndex + 1) < textValue:GetSize()
+                                    if textValue:GetCharacter(currentIndex + 1) = "/"
+                                        currentToken = currentToken + textValue:GetCharacter(currentIndex + 1)
+                                    end
+                                end
+                            end
+                            tokenIsDone = true 
+
+                        else
+                            nextCharacter = textValue:GetCharacter(currentIndex + 1)
+                        end                    
+                    else
+                        tokenIsDone = true
+                    end
+                else
+                    currentToken = currentToken + nextCharacter
+                    currentIndex = currentIndex + 1
+                end
+            else
+                beginIndex = textValue:GetSize()
+                currentToken = ""
+                tokenIsDone = true
+            end
+        end
+        if beginIndex + currentToken:GetSize() < textValue:GetSize()
+            return beginIndex + currentToken:GetSize()
+        else
+            return textValue:GetSize()
+        end
+    end
+
+    private action IsWhiteSpace(text value) returns boolean
+        boolean isWhiteSpace = false
+        if value = " " or value = value:GetCarriageReturn() or value = value:GetLineFeed() or 
+        value = value:GetTab()
+            isWhiteSpace = true
+        end
+        return isWhiteSpace
+    end
+
+    private action IsSpecialCharacter(text value) returns boolean
+        boolean isSpecialCharacter = false
+        if value = "." or value = "/" or value = "*" or value = "-" or value = "+"
+        or value = "(" or value = ")" or value = ":" or value = "<" or value = ">"
+        or value = ";" or value = "," or value = "=" or value = value:GetDoubleQuote()
+            isSpecialCharacter = true
+        end
+        return isSpecialCharacter
+    end
+
+    private action IsEndOfLine(text value) returns boolean
+        boolean isEndOfLine = false
+        if value = value:GetCarriageReturn() or value = value:GetLineFeed()
+            isEndOfLine = true
+        end
+        return isEndOfLine
+    end
+    /*
+    This is set by the TextBoxSavePreviousCaretPositionBehavior for use by the 
+    TextBoxSelectToMouseClickBehavior in determining the selection indices based on 
+    the caret position prior to the mouse click
+    */
+    action SetPreviousCaretPosition(integer previous)
+        previousCaretPosition = previous
+    end
+
+    action GetPreviousCaretPosition returns integer
+        return previousCaretPosition
+    end
+end
