@@ -54,7 +54,7 @@ With Tony Amin, I replaced that refusal with a path through `IOSSoundData`, whic
 
 **Smaller changes along the way.**
 
-- `AVAudioPlayerDelegateAdapter.didFinishPlaying` used to throw `UnsupportedOperationException`. It now prints whether playback finished successfully.
+- `AVAudioPlayerDelegateAdapter.didFinishPlaying` used to throw `UnsupportedOperationException`, and I changed it to print whether playback finished. The method is marked `@NotImplemented`, though, so RoboVM never connects it to iOS and the change has no effect when the app runs.
 - `Audio.Load(AudioSamples)` and the data it holds became static.
 - On Android, `EnableListenerDoppler` and `DisableListenerDoppler` now log that they are unsupported instead of silently doing nothing.
 - In `ClientSpeak`, Quorum's text-to-speech client, I added `ConsoleHandler` logging to the error paths while debugging on an iPhone.
@@ -127,7 +127,7 @@ My commits appear under three names: James Emerson, James Emerson (An Vo), and A
 | Feb 21, 2021 | [`5917526`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/5917526e9a7a26271626008624ec364865a68dc0) | Studied and annotated `AudioSamples.java`, and started the research log. |
 | Feb 25, 2021 | [`8170a63`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/8170a6344f91bba72b642d22689bf6931af204df) | Documented the copy methods in `AudioSamples` and logged open questions. |
 | Feb 27, 2021 | [`6ea1580`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/6ea158032b61e8fc6e6a4011bfda49e104a2df60) | Fixed errors in `AudioSamples` and `Microphone`. |
-| Mar 6, 2021 | [`39670a8`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/39670a8e53aeff5da6515440dda07be868167924) | Implemented `AVAudioPlayerDelegateAdapter.didFinishPlaying` and added notes to the research log. |
+| Mar 6, 2021 | [`39670a8`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/39670a8e53aeff5da6515440dda07be868167924) | Gave `AVAudioPlayerDelegateAdapter.didFinishPlaying` a body that prints the result, and added notes to the research log. |
 | Mar 6, 2021 | [`67c9381`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/67c9381bb8d986d1e681beea716424e056ad2c54) | Made a first pass at `IOSLoader.Load(AudioSamples)` through a static `Audio.Load`. |
 | Mar 6, 2021 | [`ab5621f`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/ab5621f0abc91a4a3225b3b2d7eff985c9d03655) | Pointed `Load(AudioSamples)` at a new `IOSSoundData(AudioSamples)` constructor, and stubbed `GetQuorumFile()` for a save-to-file approach. |
 | Mar 13, 2021 | [`b052740`](https://github.com/jamesEmerson112/iOS-audio-demo-for-Quorum-language/commit/b0527400f3a7c14bd1fc8d19a025bd58798f8d31) | Wrote a first version that converts the `short[]` sample buffer to bytes for `sun.audio` playback. Added `GetBufferShort()` and committed Quorum build outputs. |
