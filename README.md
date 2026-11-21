@@ -187,9 +187,9 @@ My part was mostly testing. I ran tests and sent the logs to the team lead, whic
 
 ## License
 
-This is a fork of Quorum, so it keeps Quorum's license. [`LICENSE`](LICENSE) is a copy of the BSD-style license that shipped with the 2021 source tree in [`Quorum/Installer/License.txt`](Quorum/Installer/License.txt), © 2011–2019 Andreas Stefik. Upstream Quorum has since moved to the [BSD-3-Clause license](https://github.com/qorf/quorum-language/blob/main/License.txt).
+This is a fork of Quorum, so it keeps Quorum's license. [`LICENSE`](LICENSE) is the BSD-style license that shipped with the 2021 source tree in [`Quorum/Installer/License.txt`](Quorum/Installer/License.txt), © 2011–2019 Andreas Stefik, with one added line for my changes: © 2021 An Vo (James Emerson). Upstream Quorum has since moved to the [BSD-3-Clause license](https://github.com/qorf/quorum-language/blob/main/License.txt).
 
-Some files keep their own terms. The libGDX-derived iOS bindings carry Apache 2.0 headers, and ObjectAL's license is in [`Plugins/SoundPlugin/iOS/ObjectAL/`](Plugins/SoundPlugin/iOS/ObjectAL). My changes are released under the same terms as the Quorum code around them.
+Some files keep their own terms. The libGDX-derived iOS bindings carry Apache 2.0 headers, and ObjectAL's license is in [`Plugins/SoundPlugin/iOS/ObjectAL/`](Plugins/SoundPlugin/iOS/ObjectAL). My changes are Copyright © 2021 An Vo (James Emerson) and are released under the same terms as the Quorum code around them, so anyone who redistributes them must keep that notice.
 
 ## Source
 
