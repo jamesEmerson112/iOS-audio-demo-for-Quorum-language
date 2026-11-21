@@ -1,0 +1,38 @@
+package Libraries.Language.Compile.Translate
+
+use Libraries.Language.Compile.Symbol.Type
+
+class NegateUnaryOpcode is UnaryOpcode
+    integer opcode = -1
+
+    action GetJavaOpcode returns integer
+        return opcode
+    end
+
+    action SetJavaOpcode(integer op)
+        opcode = op
+    end
+
+    action SetBytecodeWriteOffsetToAllChildren(integer offset)
+    end
+
+    action Write
+        VisitLineNumber()
+        QuorumOpcode op = me:GetOpcode()
+        op:Write()
+
+        JavaBytecodeMethodWriter methodWriter = GetMethodWriter()
+        methodWriter:VisitInstruction(GetJavaOpcode())
+    end
+
+    action WriteJavaScript returns text
+        QuorumOpcode op = me:GetOpcode()
+        return "-" + op:WriteJavaScript()
+    end
+
+    action GetTemplateCopy returns QuorumOpcode
+        NegateUnaryOpcode opcode 
+        opcode:SetJavaOpcode(me:GetJavaOpcode())
+        return opcode
+    end
+end

@@ -1,0 +1,34 @@
+package Libraries.Language.Compile.Context
+
+use Libraries.Containers.List
+use Libraries.Language.Compile.Symbol.Variable
+use Libraries.Language.Compile.Symbol.Type
+use Libraries.Containers.Iterator
+use Libraries.Language.Compile.Location
+
+class ActionContext is ParseContext
+    public List<Variable> parameters
+    public Location actionNameLocation
+    public Location returnLocation = undefined
+    public text actionName = ""
+    public Type returnType = undefined
+    public boolean isPublic = true
+    public boolean isPrivate = false
+
+    action GetStaticKey returns text
+        text key = ""
+        key = key + actionName
+        Iterator<Variable> it = parameters:GetIterator()
+        repeat while it:HasNext()
+            Variable var = it:Next()
+            Type type = var:GetType()
+            key = key + ":" + type:GetStaticKey()
+        end
+
+        return key
+    end
+
+    action GetParameters returns Iterator<Variable>
+        return parameters:GetIterator()
+    end
+end

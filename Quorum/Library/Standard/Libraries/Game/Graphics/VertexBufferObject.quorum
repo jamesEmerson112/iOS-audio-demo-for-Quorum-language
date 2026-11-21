@@ -1,0 +1,70 @@
+package Libraries.Game.Graphics
+
+use Libraries.Containers.Number32BitArray
+use Libraries.Containers.Array
+use Libraries.Game.Graphics.VertexData
+use Libraries.Game.Graphics.VertexAttribute
+use Libraries.Game.Disposable
+
+class VertexBufferObject is VertexData
+
+    system action Dispose
+
+    action Load(boolean isStatic, integer verticesCount, Array<VertexAttribute> attributes)
+        VertexAttributes vertexAttributes
+        vertexAttributes:SetAttributes(attributes)
+        Load(isStatic, verticesCount, vertexAttributes)
+    end
+
+    system action Load(boolean isStatic, integer verticesCount, VertexAttributes attributes)
+
+    system action GetSize returns integer
+
+    system action GetMaxSize returns integer
+
+    system action GetAttributes returns VertexAttributes
+
+    action SetVertices(Number32BitArray vertices)
+        SendToBridgeArray(vertices)
+        PopulateVertexBuffer()
+    end
+
+    private system action SetVerticesNative(integer offset, integer count)
+
+    action UpdateVertices(integer targetOffset, Number32BitArray vertices, integer sourceOffset, integer count)
+        SendToBridgeArray(vertices, sourceOffset, count)
+        UpdateVerticesNative(targetOffset, sourceOffset, count)
+    end
+
+    private system action UpdateVerticesNative(integer targetOffset, integer sourceOffset, integer count)
+
+    system action Reload
+
+    action FillVertexBuffer(Number32BitArray vertices)
+        SendToBridgeArray(vertices)
+        PopulateVertexBuffer()
+    end
+
+    /* Used to inform the plugin that we are about to send a new array of
+    doubles with the given length. */
+    private system action PrepareBridgeArray(integer length)
+
+    /* Sends an entire Quorum array to be stored in the bridge array within the plugins. */
+    private system action SendToBridgeArray(Number32BitArray array)
+
+    /* Sends part of a Quorum array to be stored in the bridge array within the plugins. */
+    private action SendToBridgeArray(Number32BitArray array, integer offset, integer count)
+        PrepareBridgeArray(count)
+        integer index = offset
+        repeat count times
+            SendToBridgeArray(index, array:Get(index))
+            index = index + 1
+        end
+    end
+
+    /* Sends a value to be stored in the bridge array at the given index. */
+    private system action SendToBridgeArray(integer index, number value)
+
+    /* Uses the filled values of the bridge array to populate the byte buffer. */
+    private system action PopulateVertexBuffer
+end

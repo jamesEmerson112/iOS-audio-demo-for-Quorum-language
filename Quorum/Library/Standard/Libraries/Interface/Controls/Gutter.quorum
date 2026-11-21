@@ -1,0 +1,145 @@
+package Libraries.Interface.Controls
+
+use Libraries.Containers.Array
+use Libraries.Game.Graphics.Color
+use Libraries.Interface.Events.GutterEvent
+use Libraries.Interface.Events.GutterListener
+use Libraries.Interface.Events.MouseEvent
+use Libraries.Interface.Layouts.LayoutProperties
+use Libraries.Interface.Views.LabelBoxView
+
+class Gutter is Control
+    
+    TextBox textBox = undefined
+    integer firstLine = -1
+    integer totalLines = -1
+    number lineHeight = -1
+    Array<GutterListener> listeners
+
+    on create
+        LayoutProperties defaultProperties = GetDefaultLayoutProperties()
+
+        Color color
+
+        defaultProperties:SetBackgroundColor(color:CustomColor(233.0/255.0, 232.0/255.0, 226.0/255.0, 1))
+        defaultProperties:SetBorderColor(color:CustomColor(142.0/255.0, 142.0/255.0, 142.0/255.0, 1))
+        defaultProperties:SetBorderThickness(1)
+        defaultProperties:SetBorderStyle(defaultProperties:RIGHT)
+
+        SetInputGroup("Gutter")
+    end
+
+    action UpdateLines(integer firstLine, integer totalLines, number lineHeight)
+        me:firstLine = firstLine
+        me:totalLines = totalLines
+        me:lineHeight = lineHeight
+        UpdateVisuals(firstLine, totalLines, lineHeight)
+    end
+
+    blueprint action UpdateVisuals(integer firstLine, integer totalLines, number lineHeight)
+
+    action ClickedMouse(MouseEvent mouseEvent)
+        integer clickedLine = firstLine
+        number y = mouseEvent:GetY() - GetGlobalY()
+        number threshold = GetHeight()
+
+        repeat while threshold >= 0
+            threshold = threshold - lineHeight
+            if y > threshold
+                // We've found the clicked line, exit the loop.
+                threshold = -1
+            else
+                clickedLine = clickedLine + 1
+            end
+        end
+
+        GutterEvent event
+        event:Set(me, clickedLine, mouseEvent)
+        integer counter = 0
+        repeat while counter < listeners:GetSize()
+            listeners:Get(counter):GutterClicked(event)
+            counter = counter + 1
+        end
+
+        /*
+        Typically we'd want to allow the parent action to proceed so that it
+        can process the mouse click with the view, but in the gutter's case
+        we don't want the gutter to depress like a button, so we omit it.
+        */
+        // parent:Control:ClickedMouse()
+    end
+
+    /*
+    This action returns the first line of the TextBox which is described by this
+    Gutter. This value is automatically updated whenever the UpdateLines action
+    is called, or whenever the TextBox associated with this Gutter is modified.
+
+    Attribute: Returns The first line of text the Gutter corresponds to.
+    */
+    action GetFirstLine returns integer
+        return firstLine
+    end
+
+    /*
+    This action returns the total number of lines of text that this Gutter is
+    currently displaying. This value is automatically updated whenever the
+    UpdateLines action is called, or whenever the TextBox associated with this
+    Gutter is modified.
+
+    Attribute: Returns The number of visible lines in this Gutter.
+    */
+    action GetTotalLines returns integer
+        return totalLines
+    end
+
+    /*
+    This action returns the height of each line of text associated with this
+    Gutter. This value is automatically updated whenever the UpdateLines action
+    is called, or whenever the TextBox associated with this Gutter is modified.
+
+    Attribute: Returns The height of each line of text represented by the Gutter.
+    */
+    action GetLineHeight returns number
+        return lineHeight
+    end
+
+    action SetTextBox(TextBox box)
+        textBox = box
+    end
+
+    action GetTextBox returns TextBox
+        return textBox
+    end
+
+    action LoadGraphics(LayoutProperties properties)
+        if properties:GetView2D() = undefined
+            if GetView2D() = undefined
+                LabelBoxView view
+                view:SetBorderThickness(cast(integer, properties:GetBorderThickness()))
+                view:SetBorderStyle(properties:GetBorderStyle())
+                view:Initialize(properties:GetBackgroundColor(), properties:GetBorderColor())
+                SetView2D(view)
+            end
+        elseif properties:GetView2D() not= GetView2D()
+            SetView2D(properties:GetView2D())
+        end
+
+        parent:Control:LoadGraphics(properties)
+    end
+
+    action AddGutterListener(GutterListener listener)
+        listeners:Add(listener)
+    end
+
+    action RemoveGutterListener(GutterListener listener)
+        listeners:Remove(listener)
+    end
+
+    action GetGutterListeners returns Array<GutterListener>
+        return listeners
+    end
+
+    action EmptyGutterListeners
+        listeners:Empty()
+    end
+end

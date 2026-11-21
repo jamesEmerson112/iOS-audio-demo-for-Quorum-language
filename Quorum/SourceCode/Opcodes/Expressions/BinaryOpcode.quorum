@@ -1,0 +1,199 @@
+package Libraries.Language.Compile.Translate
+
+use Libraries.Language.Compile.Symbol.Type
+use Libraries.Language.Compile.Symbol.Operation
+
+class BinaryOpcode is QuorumOpcode
+    QuorumOpcode left = undefined
+    QuorumOpcode right = undefined
+    Operation op = undefined
+    integer opcode = -1
+    integer leftOpcode = -1
+    integer rightOpcode = -1
+    integer leftOpcode2 = -1
+    integer rightOpcode2 = -1
+
+    action SetOperation(Operation op)
+        me:op = op
+    end
+
+    action GetOperation returns Operation
+        return op
+    end
+
+    action SetBytecodeWriteOffsetToAllChildren(integer offset)
+        SetBytecodeWriteOffset(offset)
+        if left not= undefined
+            left:SetBytecodeWriteOffsetToAllChildren(offset)
+        end
+
+        if right not= undefined
+            right:SetBytecodeWriteOffsetToAllChildren(offset)
+        end
+    end
+
+    action SetMethodWriterToAllChildren(JavaBytecodeMethodWriter writer)
+        SetMethodWriter(writer)
+        if left not= undefined
+            left:SetMethodWriterToAllChildren(writer)
+        end
+
+        if right not= undefined
+            right:SetMethodWriterToAllChildren(writer)
+        end
+    end
+
+    action WriteJavaScript returns text
+        integer current = op:GetOperation()
+        text result = ""
+        text leftResult = left:WriteJavaScript()
+        text operator = ""
+        
+
+        if current = op:PLUS
+            operator =  "+"
+        elseif current = op:MINUS
+            operator =  "-"
+        elseif current = op:TIMES
+            operator =  "*"
+        elseif current = op:DIVIDE
+            operator =  "/"
+        elseif current = op:MODULUS
+            operator =  "%"
+        elseif current = op:AND
+            operator =  "&&"
+        elseif current = op:OR
+            operator =  "||"
+        elseif current = op:EQUALS
+            operator =  "=="
+        elseif current = op:NOT_EQUALS
+            operator =  "!="
+        elseif current = op:GREATER_EQUALS
+            operator =  ">="
+        elseif current = op:GREATER
+            operator =  ">"
+        elseif current = op:LESS_EQUALS
+            operator =  "<="
+        elseif current = op:LESS
+            operator =  "<"
+        elseif current = op:NOT
+            operator =  "!"
+        end
+
+        text rightResult = right:WriteJavaScript()
+
+        Type leftType = left:GetType()
+        Type rightType = right:GetType()
+        if leftType:IsText() and rightType:IsNumber()
+            rightResult = "(global_number_converter_(" + rightResult + "))"
+        elseif leftType:IsNumber() and rightType:IsText()
+            leftResult = "(global_number_converter_(" + leftResult + "))"
+        end
+
+        //we have to take the floor, because JavaScript doesn't have integers
+        if leftType:IsInteger() and rightType:IsInteger() and current = op:DIVIDE
+            result = result + "global_truncate_(" + leftResult + " " + operator + " " + rightResult + ")"
+        else
+            result = result + "(" + leftResult + " " + operator + " " + rightResult + ")"
+        end
+        return result
+    end
+
+    action GetJavaOpcode returns integer
+        return opcode
+    end
+
+    action GetJavaLeftOpcode returns integer
+        return leftOpcode
+    end
+
+    action GetJavaRightOpcode returns integer
+        return rightOpcode
+    end
+
+    action GetJavaLeftOpcode2 returns integer
+        return leftOpcode2
+    end
+
+    action GetJavaRightOpcode2 returns integer
+        return rightOpcode2
+    end
+
+    action SetJavaOpcode(integer op)
+        opcode = op
+    end
+
+    action SetJavaLeftOpcode(integer op)
+        leftOpcode = op
+    end
+
+    action SetJavaRightOpcode(integer op)
+        rightOpcode = op
+    end
+
+    action SetJavaLeftOpcode2(integer op)
+        leftOpcode2 = op
+    end
+
+    action SetJavaRightOpcode2(integer op)
+        rightOpcode2 = op
+    end
+
+    action GetLeftOpcode returns QuorumOpcode
+        return left
+    end
+
+    action GetRightOpcode returns QuorumOpcode
+        return right
+    end
+
+    action SetLeftOpcode(QuorumOpcode op)
+        left = op
+    end
+
+    action SetRightOpcode(QuorumOpcode op)
+        right = op
+    end
+
+    action Write
+        VisitLineNumber()
+        JavaBytecodeMethodWriter methodWriter = GetMethodWriter()
+        left:Write()
+        WriteLeft()
+        right:Write()
+        WriteRight()
+
+        if opcode not= -1
+            methodWriter:VisitInstruction(opcode)
+        end
+    end
+
+    action WriteLeft
+        JavaBytecodeMethodWriter methodWriter = GetMethodWriter()
+        if leftOpcode not= -1
+            methodWriter:VisitInstruction(leftOpcode)
+        end
+    end
+
+    action WriteRight
+        JavaBytecodeMethodWriter methodWriter = GetMethodWriter()
+        if rightOpcode not= -1
+            methodWriter:VisitInstruction(rightOpcode)
+        end
+    end
+
+    action GetTemplateCopy returns QuorumOpcode
+        BinaryOpcode bop
+        Type t = GetType()
+        me:SetType(t:Copy())
+        bop:opcode = opcode
+        bop:leftOpcode = leftOpcode
+        bop:rightOpcode = rightOpcode
+
+        Operation newOp
+        newOp:SetOperation(op:GetOperation())
+        bop:SetOperation(newOp)
+
+        return bop
+    end
+end

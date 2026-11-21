@@ -1,0 +1,812 @@
+package Libraries.Language.Compile
+use Libraries.Containers.Array
+use Libraries.Containers.Iterator
+use Libraries.Language.Compile.Symbol.Class
+use Libraries.Language.Compile.Symbol.Action
+use Libraries.Language.Compile.Symbol.Block
+use Libraries.Language.Compile.Symbol.Variable
+use Libraries.System.File
+use Libraries.Language.Compile.Symbol.Type
+use Libraries.Language.Compile.Symbol.SymbolTable
+use Libraries.Containers.HashTable
+
+class CodeCompletionHandler 
+    constant text USE = "use"
+    constant text PACKAGE = "package"
+
+    private action AddUseResults(CodeCompletionRequest request, CodeCompletionResult result, boolean isUse)
+        text trim = request:line
+        trim = trim:Trim()
+        if isUse
+            trim = trim:GetSubtext(USE:GetSize())
+        else
+            trim = trim:GetSubtext(PACKAGE:GetSize())
+        end
+
+        trim = trim:Trim()
+        Array<text> values = trim:Split("\.")
+
+        integer filterSize = 0
+        if not values:IsEmpty() and not trim:IsEmpty()
+            if trim:GetCharacter(trim:GetSize() - 1) = "."
+                result:filter = ""
+            else
+                result:filter = values:Get(values:GetSize() - 1)
+            end
+
+            text filter = result:filter
+            filterSize = filter:GetSize()
+        end
+
+        constant text root = "Libraries"
+        if values:GetSize() = 1
+            text left = values:Get(0)
+            text leftTrimmed = left:Trim()
+            if leftTrimmed:IsEmpty()
+                CodeCompletionItem item
+                item:SetType(item:PACKAGE)
+                item:displayText = root
+                item:completionText = root
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size
+                result:Add(item)
+                AddCustomClasses(request, result, root)
+            elseif left = root
+                AddSubpackagesAndClasses(request, result, root)
+                AddCustomClasses(request, result, root)
+            elseif root:StartsWith(left)
+                CodeCompletionItem item
+                item:SetType(item:PACKAGE)
+                item:displayText = root
+                item:completionText = root
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size
+                result:Add(item)
+                AddCustomClasses(request, result, root)
+            end
+        else 
+            text valueNoFilter = trim:GetSubtext(0, trim:GetSize() - filterSize - 1)
+            AddSubpackagesAndClasses(request, result, valueNoFilter)
+        end
+    end
+
+    action Request(CodeCompletionRequest request) returns CodeCompletionResult
+        CodeCompletionResult result
+        if request:result = undefined or request:result:symbolTable = undefined
+            return result
+        end
+
+        text source = request:source
+        integer index = request:caretLocation
+        text line = GetLineBeforeCursor(index, source)
+        request:unmodifiedLine = line
+        result:prefix = line
+        text trimmed = line:Trim()
+        request:line = trimmed
+        boolean isUse = trimmed:StartsWith("use")
+        boolean isPackage = trimmed:StartsWith("package")
+
+        text requestLine = request:line //this is already trimmed
+        Array<text> split = requestLine:Split(":")
+        CompilerResult compilerResult = request:result
+        CompilerResult lastCompiledResult = request:lastCompiledResult
+
+        //now set the filter for this particular request
+        SetFilter(result, split, line)
+        SymbolTable last = undefined
+        SymbolTable compiled = undefined
+        if compilerResult not= undefined
+            last = compilerResult:symbolTable
+        end
+
+        if lastCompiledResult not= undefined
+            compiled = lastCompiledResult:symbolTable
+        end
+        Class clazz = GetBestChoiceClass(request:result, lastCompiledResult, request:fileKey)
+        SymbolTable table = GetBestChoiceSymbolTable(request:result, lastCompiledResult)
+        
+        if clazz = undefined or table = undefined or not IsLegalCall(request, clazz, split)
+            return result
+        end
+
+        request:clazz = clazz
+        request:table = table
+        FindLocation(request, clazz)
+        CheckIfVariableCall(request, result, clazz, split)
+
+        if isUse
+            AddUseResults(request, result, true)
+        elseif not isUse and isPackage
+            AddUseResults(request, result, false)
+        elseif not isUse and not isPackage
+            AddRegion(request, result)
+        end
+
+        return result
+    end
+
+    private action SetFilter(CodeCompletionResult result, Array<text> split, text line)
+        if split:GetSize() > 0 and not line:IsEmpty()
+            text ch = line:GetCharacter(line:GetSize() - 1)
+            if ch = ":"
+                result:filter = ""
+            else
+                result:filter = split:Get(split:GetSize() - 1)
+            end
+        end
+    end
+
+    private action GetBestChoiceClass(CompilerResult last, CompilerResult compiled, text file) returns Class
+        if compiled not= undefined and compiled:symbolTable not= undefined
+            Class clazz = compiled:symbolTable:GetClassInFile(file)
+            if clazz not= undefined
+                return clazz
+            end
+        end
+
+        if last not= undefined and last:symbolTable not= undefined
+            Class clazz = last:symbolTable:GetClassInFile(file)
+            if clazz not= undefined
+                return clazz
+            end
+        end
+
+        return undefined
+    end
+
+    private action GetBestChoiceSymbolTable(CompilerResult last, CompilerResult compiled) returns SymbolTable
+        if compiled not= undefined and compiled:symbolTable not= undefined
+            return compiled:symbolTable
+        end
+
+        if last not= undefined and last:symbolTable not= undefined
+            return last:symbolTable
+        end
+
+        return undefined
+    end
+
+    /*
+        This checks if the request is within bounds and that the class is valid
+    */
+    private action IsLegalCall(CodeCompletionRequest request, Class clazz, Array<text> split) returns boolean
+        //now we have checked the cache. If this is still undefined, bail
+        if clazz not= undefined
+            integer start = clazz:GetIndex()
+            integer finish = clazz:GetIndexEnd()
+
+            //is it inside of this class? If not, kill the request, because no syntax is legal
+            if not(request:caretLocation >= start and request:caretLocation <= finish)
+                clazz = undefined
+                return false
+            end
+
+            if split:IsEmpty()
+                clazz = undefined
+                return false
+            end
+        else 
+            return false
+        end
+        //the class is defined and within bounds.
+        return true
+    end
+
+    private action FindLocation(CodeCompletionRequest request, Class clazz)
+        Action method = GetActionAtIndex(clazz, request:caretLocation)
+            
+        Block block = undefined
+        if method not= undefined
+            block = GetBlockAtIndex(method:GetBlock(), request:caretLocation)
+        end
+
+        request:method = method
+        request:block = block
+    end
+
+    private action CheckIfVariableCall(CodeCompletionRequest request, CodeCompletionResult result, 
+        Class clazz, Array<text> split)
+        text left = Trim(split:Get(0):Trim(), split, result)
+        if left = undefined
+            return now //should never return undefined unless the request is invalid
+        end
+        request:left = left
+
+        if request:block not= undefined
+            Variable variable = request:block:GetVariable(left)
+            request:variable = variable
+
+            if variable not= undefined
+                Type type = variable:GetType()
+                SymbolTable table = request:table
+
+                if not type:IsPrimitive()
+                    text key = type:GetStaticKey()
+                    Class varClass = table:GetClass(key)
+                    request:variableClass = varClass
+                else 
+                    text key = type:ConvertToNonPrimitiveStaticKey()
+                    Class varClass = table:GetClass(key)
+                    request:variableClass = varClass
+                    request:isPrimitiveConversion = true
+                end
+            end
+        end
+    end
+
+
+    private action AddRegion(CodeCompletionRequest request, CodeCompletionResult result)
+        Class clazz = request:clazz
+        Action method = request:method
+        Block block = request:block
+
+        //we are in the field region, so work there
+        if block = undefined and method = undefined
+            AddFieldRegion(request, result)
+        //if there is ever a case where the block is undefined and the method isn't, that's a compiler
+        //bug. The method "has" a block, so it shouldn't happen ever.
+        elseif block not= undefined and method not= undefined
+            AddActionRegion(request, result)
+        end
+    end
+
+    private action AddAvailableClasses(CodeCompletionRequest request, CodeCompletionResult result)
+        SymbolTable table = request:table
+        Iterator<Class> classes = table:GetClasses()
+
+        if classes not= undefined
+            repeat while classes:HasNext()
+                Class clazz = classes:Next()
+                CodeCompletionItem item = GetClassCompletionItem(clazz)
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size
+                result:Add(item)
+            end
+        end
+    end
+
+    private action AddActionRegion(CodeCompletionRequest request, CodeCompletionResult result)
+        if request:left = "me"
+            AddClassVariables(request, result)
+            AddParentVariables(request, result)
+        elseif request:variable = undefined
+            AddClassVariables(request, result)
+            AddParentVariables(request, result)
+
+            AddActions(request, result)
+            AddBlockVariables(request, result)
+            AddPrimitives(request, result)
+            AddControlStructures(request, result)
+            AddAvailableClasses(request, result)
+        //this is a call where we've detected we are calling on a variable
+        elseif request:variable not= undefined
+            AddClassVariables(request, result)
+            //AddParentVariables(request, result)
+
+            AddActions(request, result)
+            //AddBlockVariables(request, result)
+        end
+    end
+
+    private action AddFieldRegion(CodeCompletionRequest request, CodeCompletionResult result)
+        if request:left = "me"
+            AddClassVariables(request, result)
+            AddParentVariables(request, result)
+        elseif request:left:IsEmpty()
+            AddClassVariables(request, result)
+            AddParentVariables(request, result)
+            AddPrimitives(request, result)
+            AddAvailableClasses(request, result)
+        end
+    end
+
+    private action AddPrimitives(CodeCompletionRequest request, CodeCompletionResult result)
+        text filter = result:filter
+        integer size = filter:GetSize()
+        
+
+        CodeCompletionItem intItem
+        intItem:SetType(intItem:PRIMITIVE)
+        intItem:displayText = "integer"
+        intItem:completionText = "integer value = 0"
+        intItem:dotOffset = request:caretLocation - size
+        result:Add(intItem)
+
+        CodeCompletionItem numItem
+        numItem:SetType(intItem:PRIMITIVE)
+        numItem:displayText = "number"
+        numItem:completionText = "number value = 0"
+        numItem:dotOffset = request:caretLocation - size
+        result:Add(numItem)
+
+        CodeCompletionItem boolItem
+        boolItem:SetType(intItem:PRIMITIVE)
+        boolItem:displayText = "boolean"
+        boolItem:completionText = "boolean value = false"
+        boolItem:dotOffset = request:caretLocation - size
+        result:Add(boolItem)
+
+        CodeCompletionItem textItem
+        textItem:SetType(intItem:PRIMITIVE)
+        textItem:displayText = "text"
+        text dq = ""
+        dq = dq:GetDoubleQuote()
+        textItem:completionText = "text value = " + dq + dq
+        textItem:dotOffset = request:caretLocation - size
+        result:Add(textItem)
+    end
+
+    private action AddControlStructures(CodeCompletionRequest request, CodeCompletionResult result)
+        text filter = result:filter
+        integer size = filter:GetSize()
+
+        text left = request:unmodifiedLine
+        text space = GetWhiteSpaceAmount(left)
+        text lf = left:GetLineFeed()
+
+        CodeCompletionItem ifItem
+        ifItem:SetType(ifItem:CONTROL_STRUCTURE)
+        ifItem:displayText = "if"
+        ifItem:completionText = "if true" + lf + space + "end"
+        ifItem:dotOffset = request:caretLocation - size
+        result:Add(ifItem)
+
+        CodeCompletionItem repeatItem
+        repeatItem:SetType(ifItem:CONTROL_STRUCTURE)
+        repeatItem:displayText = "repeat"
+        repeatItem:completionText = "repeat while false" + lf + space + "end"
+        repeatItem:dotOffset = request:caretLocation - size
+        result:Add(repeatItem)
+
+        CodeCompletionItem repeatItem2
+        repeatItem2:SetType(ifItem:CONTROL_STRUCTURE)
+        repeatItem2:displayText = "repeat while <condition>"
+        repeatItem2:completionText = "integer i = 0" + lf + space + "repeat while i < 10" + lf + lf + space + "    i = i + 1" + lf + space + "end"
+        repeatItem2:dotOffset = request:caretLocation - size
+        result:Add(repeatItem2)
+    end
+
+    private action GetWhiteSpaceAmount(text left) returns text
+        text result = ""
+        
+        i = 0
+        repeat while i < left:GetSize()
+            text value = left:GetCharacter(i)
+            if value = " "
+                result = result + value
+            elseif value = "    "
+                result = result + value
+            elseif value = value:GetCarriageReturn() or value = value:GetLineFeed() //note that it exists, but ignore it.
+            else
+                i = left:GetSize()
+            end
+            i = i + 1
+        end
+        return result
+    end
+
+    private action AddActions(CodeCompletionRequest request, CodeCompletionResult result)
+        boolean showPrivate = request:isRequestInClass
+        Class clazzToProcess = request:clazz
+        if request:variable not= undefined
+            clazzToProcess = request:variableClass
+            showPrivate = false
+        end
+
+        //if this is the current class, load all methods, public or private
+        //if this is a variable, load only its public methods.
+        Iterator<Action> actions = clazzToProcess:GetVirtualTable()
+        repeat while actions:HasNext()
+            Action act = actions:Next()
+            CodeCompletionItem item = undefined
+            if request:variable not= undefined
+                item = act:GetCodeCompletionItem(request:variable)
+            else
+                item = act:GetCodeCompletionItem()
+            end
+            text filter = result:filter
+            integer size = filter:GetSize()
+            item:dotOffset = request:caretLocation - size// + additionalDotOffset
+
+            //is this action in the base class or the v-table?
+            if request:clazz:HasAction(act:GetStaticKey())
+                item:isBaseClassAction = true
+            end
+
+            boolean isPrimitive = request:isPrimitiveConversion
+            if isPrimitive
+                text value = act:GetName()
+                if value not= "GetValue" and value not= "SetValue"
+                    if showPrivate
+                        result:Add(item)
+                    else
+                        if not act:IsPrivate()
+                            result:Add(item)
+                        end
+                    end
+                end
+            else
+                if showPrivate
+                    result:Add(item)
+                else
+                    if not act:IsPrivate()
+                        result:Add(item)
+                    end
+                end
+            end
+        end
+    end
+
+    private action Trim(text left, Array<text> split, CodeCompletionResult result) returns text
+        text line2 = left
+        text trimmedLeft = left:Trim()
+        integer i = line2:GetSize() - 1
+        repeat while i >= 0
+            text ch = line2:GetCharacter(i)
+            if ch = "(" or ch = ","
+                or ch = "*" or ch = "/"
+                or ch = "+" or ch = "-"
+                or ch = " " or IsMod(line2, i) 
+                //make this work for mod --- if it's a d, check backwards and ensure that it's not part of another word
+
+                //split the line again
+                line2 = line2:GetSubtext(i + 1, line2:GetSize())
+                left = line2
+                line2 = line2:Trim()
+                split = line2:Split(":")
+                if split:IsEmpty()
+                    return undefined
+                end
+
+                if split:GetSize() > 1 or line2:Contains(":")
+                    text ch2 = line2:GetCharacter(line2:GetSize() - 1)
+                    if ch2 = ":"
+                        result:filter = ""
+                    else
+                        result:filter = split:Get(split:GetSize() - 1)
+                    end
+                end
+                trimmedLeft = line2
+                i = -1
+            end
+            i = i - 1
+        end
+        return trimmedLeft
+    end
+
+    /* Add all of the fields from this class */
+    private action AddClassVariables(CodeCompletionRequest request, CodeCompletionResult result)
+        boolean showPrivate = request:isRequestInClass
+        Class clazzToProcess = request:clazz
+        if request:variable not= undefined
+            clazzToProcess = request:variableClass
+            showPrivate = false
+        end
+
+        Iterator<Variable> variables = clazzToProcess:GetVariables()
+        repeat while variables:HasNext()
+            Variable variable2 = variables:Next()
+            if variable2:GetType() not= undefined
+                CodeCompletionItem item = variable2:GetCodeCompletionItem(clazzToProcess)
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size// + additionalDotOffset
+                if request:isRequestInClass
+                    result:Add(item)
+                else
+                    if not variable2:IsPrivate()
+                        result:Add(item)
+                    end
+                end
+            end
+        end
+    end
+
+    private action AddParentVariables(CodeCompletionRequest request, CodeCompletionResult result)
+        //now add all of the parent fields from this class
+        Iterator<Class> parents = request:clazz:GetParentClasses()
+        repeat while parents:HasNext()
+            Class par = parents:Next()
+            Iterator<Variable> variables2 = par:GetVariables()
+            repeat while variables2:HasNext()
+                Variable variable2 = variables2:Next()
+                if variable2:GetType() not= undefined
+                    CodeCompletionItem item = variable2:GetCodeCompletionItem(request:clazz)
+                    if item not= undefined and variable2:IsPrivate()
+                        item:SetType(item:PARENT_FIELD_PRIVATE)
+                    elseif item not= undefined and not variable2:IsPrivate()
+                        item:SetType(item:PARENT_FIELD_PUBLIC)
+                    end
+
+                    text filter = result:filter
+                    integer size = filter:GetSize()
+                    item:dotOffset = request:caretLocation - size// + additionalDotOffset
+                    if request:isRequestInClass
+                        result:Add(item)
+                    else
+                        if not variable2:IsPrivate()
+                            result:Add(item)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    private action AddVariable(CodeCompletionRequest request, CodeCompletionResult result, Variable variable)
+        if variable:GetType() not= undefined
+            CodeCompletionItem item = variable:GetCodeCompletionItem(request:clazz)
+            text filter = result:filter
+            integer size = filter:GetSize()
+            item:dotOffset = request:caretLocation - size// + additionalDotOffset
+            if request:isRequestInClass
+                result:Add(item)
+            else
+                if not variable:IsPrivate()
+                    result:Add(item)
+                end
+            end
+        end
+    end
+
+    private action AddBlockVariables(CodeCompletionRequest request, CodeCompletionResult result)
+        Iterator<Variable> variables = request:block:GetVariablesAllBlocks()
+        repeat while variables:HasNext()
+            Variable variable = variables:Next()
+            AddVariable(request, result, variable)
+        end
+
+        Action method = request:method
+        if method not= undefined
+            Iterator<Variable> parameters = method:GetParameterIterator()
+            repeat while parameters:HasNext()
+                Variable variable = parameters:Next()
+                AddVariable(request, result, variable)
+            end
+        end
+    end
+
+    private action IsMod(text partial, integer i) returns boolean
+        if i - 3 < 0
+            return false
+        end
+
+        if partial:GetCharacter(i) = "d"
+            and partial:GetCharacter(i - 1) = "o"
+            and partial:GetCharacter(i - 2) = "m"
+            and partial:GetCharacter(i - 3) = " "
+            return true
+        end
+
+        return false
+    end
+
+    private action GetLineBeforeCursor(integer loc, text source) returns text
+        if loc - 1 <= source:GetSize()
+            integer i = loc - 1
+            text CR = source:GetLineFeed()
+
+            integer start = 0
+            repeat while i >=0 
+                text ch = source:GetCharacter(i)
+                if ch = CR //this is the end of the line
+                    start = i
+                    i = -1
+                end
+                i = i - 1
+            end
+            
+            text sub = source:GetSubtext(start, loc)
+            return sub
+        end
+
+        return undefined
+    end
+    
+    private action AddCustomClasses(CodeCompletionRequest request, CodeCompletionResult result, text pack)
+        SymbolTable sandboxSymbolTable = request:result:symbolTable
+        Iterator<Class> classes = sandboxSymbolTable:GetClassesInPackage(pack)
+
+        if classes not= undefined
+            repeat while classes:HasNext()
+                Class clazz = classes:Next()
+                CodeCompletionItem item = GetClassCompletionItem(clazz)
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size
+                result:Add(item)
+            end
+        end
+    end
+
+    private action GetClassCompletionItem(Class clazz) returns CodeCompletionItem
+        CodeCompletionItem item
+        item:SetType(item:CLASS)
+
+        text signature = clazz:GetStaticKey()
+        text name = clazz:GetName()
+
+        text description = ""
+        description = description + "<h1>" + signature + "</h1>"
+
+        item:displayText = name
+        item:completionText = name
+        item:documentationText = "Test"
+        return item
+    end
+
+    private action GetPackageCompletionItem(text pack) returns CodeCompletionItem
+        CodeCompletionItem item
+        item:SetType(item:PACKAGE)
+
+        text signature = pack
+        text name = pack
+
+        text description = "<h1>" + signature + "</h1>"
+
+        item:displayText = name
+        item:completionText = name
+        item:documentationText = ""
+        return item
+    end
+
+    private action AddSubpackagesAndClasses(CodeCompletionRequest request, CodeCompletionResult result, text name)
+        SymbolTable sandboxSymbolTable = request:table
+        //first find all of the packages/sub-packages 
+        Iterator<text> packs = sandboxSymbolTable:GetSubpackageNames(name)
+        repeat while packs:HasNext()
+            text pack = packs:Next()
+            integer size = name:GetSize() + 1
+            text subpackName = pack:GetSubtext(0, size)
+            text filteredName = subpackName + result:filter
+            subpackName = pack:GetSubtext(size, pack:GetSize())
+
+            if pack:StartsWith(filteredName)
+                CodeCompletionItem item = GetPackageCompletionItem(subpackName)
+                text filter = result:filter
+                integer size2 = filter:GetSize()
+                item:dotOffset = request:caretLocation - size2
+                result:Add(item)
+            end
+        end
+
+        //next find any classes on the system in the package
+        Iterator<Class> classesInPackage = sandboxSymbolTable:GetClassesInPackage(name)
+        boolean hasAny = false
+        if classesInPackage not= undefined
+            hasAny = classesInPackage:HasNext()
+            repeat while classesInPackage:HasNext()
+                Class pack = classesInPackage:Next()
+                text key = pack:GetStaticKey()
+                CodeCompletionItem item = GetClassCompletionItem(pack)
+                text filter = result:filter
+                integer size = filter:GetSize()
+                item:dotOffset = request:caretLocation - size
+                result:Add(item)
+            end
+        end
+        
+        //finally, remind the user they can use the "all" keyword
+        if hasAny
+            CodeCompletionItem item
+            item:SetType(item:PACKAGE)
+            text DQ = ""
+            DQ = DQ:GetDoubleQuote()
+            text signature = "Use all classes with the " + DQ + "all" + DQ + " keyword."
+            text itemName = "all"
+
+            text description = "<h1>" + signature + "</h1>"
+                    + "<p align=" + DQ + "justify" + DQ + ">The word "
+                    + "all indicates to quorum that we would like to"
+                    + " have access to all classes in the package. For "
+                    + "example, the phrase Libraries.Containers.all would indicate "
+                    + "that we want to use any class in the Libraries.Containers "
+                    + "package."
+                    + "</p>"
+            description = description + "<h2>" + "Code Example:" + "</h2>"
+            description = description + "<PRE><CODE>"
+                    + "use Libraries.Containers.all\n\n"
+                    + "List&lt;integer&gt; list\n"
+                    + "Array&lt;integer&gt; array"
+                    + "</PRE></CODE>"
+
+            item:displayText = itemName
+            item:documentationText = description
+            item:completionText = "all"
+            text filter = result:filter
+            integer size = filter:GetSize()
+            item:dotOffset = request:caretLocation - size
+            result:Add(item)
+        end
+    end
+
+    /*
+        Obtains the logical block located at this index. 
+    */
+    private action GetBlockAtIndex(Block block, integer index) returns Block
+        Block bestBlock = undefined
+
+        if block not= undefined
+            boolean test = IsIndexInLocation(block, index)
+            if test
+                bestBlock = block
+            end
+            //get subblocks and try those
+            //this call recursively calls to subblocks, thus no need
+            //for going deeper in this loop exists
+            Iterator<Block> blocks = block:GetBlocks()
+            repeat while blocks:HasNext()
+                Block b = blocks:Next()
+                Block returnedBlock = GetBlockAtIndex(b, index)
+                if returnedBlock not= undefined
+                    if IsIndexInLocation(returnedBlock, index)
+                        integer start = returnedBlock:GetIndex()
+                        integer finish = returnedBlock:GetIndexEnd()
+                        integer range = finish - start
+
+                        if bestBlock = undefined
+                            bestBlock = returnedBlock
+                        else
+                            integer bestStart = bestBlock:GetIndex()
+                            integer bestFinish = bestBlock:GetIndexEnd()
+                            integer bestRange = bestFinish - bestStart
+                            //this block is nested 
+                            if range < bestRange
+                                bestBlock = returnedBlock
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        return bestBlock
+    end
+
+    private action IsIndexInLocation(Location location, integer index) returns boolean
+        integer start = location:GetIndex()
+        integer finish = location:GetIndexEnd()
+        if index >= start and index <= finish
+            return true
+        end
+
+        return false
+    end
+
+    private action GetActionAtIndex(Class clazz, integer index) returns Action
+        Action act = undefined
+        File file = clazz:GetFile()
+        text classPath = file:GetAbsolutePath()
+
+        Iterator<Action> actions = clazz:GetActions()
+        repeat while actions:HasNext()
+            Action a = actions:Next()
+            integer start = a:GetIndex()
+            integer finish = a:GetIndexEnd()
+            File f = a:GetFile()
+            text actionPath = f:GetAbsolutePath()
+            if index >= start and index <= finish and classPath = actionPath
+                act = a
+                return act
+            end
+        end
+        //check the constructor
+        if act = undefined
+            Action constructor = clazz:GetConstructor()
+            if constructor not= undefined
+                integer start = constructor:GetIndex()
+                integer finish = constructor:GetIndexEnd()
+                File f = constructor:GetFile()
+                text actionPath = f:GetAbsolutePath()
+                if index >= start and index <= finish and classPath = actionPath
+                    act = constructor
+                    return act
+                end
+            end
+        end
+        return act
+    end
+end

@@ -1,0 +1,227 @@
+package Libraries.Language.Compile.Translate
+
+use Libraries.Language.Compile.Symbol.Type
+use Libraries.Language.Compile.Symbol.Operation
+
+class BinaryAndOrOpcode is QuorumOpcode
+    public boolean isAnd = true
+    public QuorumOpcode left = undefined
+    public QuorumOpcode right = undefined
+    //public JavaBytecodeMethodWriter methodWriter = undefined
+    JavaBytecodeLabel trueLabel = undefined
+    JavaBytecodeLabel falseLabel = undefined
+    JavaBytecodeLabel finalLabel = undefined
+    JavaBytecodeLabel leftHandSideLabel = undefined
+    JavaBytecodeLabel rightHandSideLabel = undefined
+    JavaBytecodeLabel jumpLabel = undefined
+    JavaBytecodeOpcodes opcodes
+    public boolean hasParent = false
+    public boolean isOnLeft = false
+    public BinaryAndOrOpcode opcodeParent = undefined
+    Operation op = undefined
+
+    action SetOperation(Operation op)
+        me:op = op
+    end
+
+    action GetOperation returns Operation
+        return op
+    end
+
+    action SetBytecodeWriteOffsetToAllChildren(integer offset)
+        SetBytecodeWriteOffset(offset)
+        if left not= undefined
+            left:SetBytecodeWriteOffsetToAllChildren(offset)
+        end
+
+        if right not= undefined
+            right:SetBytecodeWriteOffsetToAllChildren(offset)
+        end
+    end
+
+    action SetMethodWriterToAllChildren(JavaBytecodeMethodWriter writer)
+        SetMethodWriter(writer)
+        Libraries.Language.Compile.Location value = GetLocation()
+        if left not= undefined
+            left:SetMethodWriterToAllChildren(writer)
+        end
+
+        if right not= undefined
+            right:SetMethodWriterToAllChildren(writer)
+        end
+    end
+
+    action WriteJavaScript returns text
+        //This isn't working yet, it's just been stubbed in
+        text result = "(" + left:WriteJavaScript()
+        text operator = ""
+        integer current = op:GetOperation()
+
+        if current = op:PLUS
+            operator =  "+"
+        elseif current = op:MINUS
+            operator =  "-"
+        elseif current = op:TIMES
+            operator =  "*"
+        elseif current = op:DIVIDE
+            operator =  "/"
+        elseif current = op:MODULUS
+            operator =  "%"
+        elseif current = op:AND
+            operator =  "&&"
+        elseif current = op:OR
+            operator =  "||"
+        elseif current = op:EQUALS
+            operator =  "=="
+        elseif current = op:NOT_EQUALS
+            operator =  "!="
+        elseif current = op:GREATER_EQUALS
+            operator =  ">="
+        elseif current = op:GREATER
+            operator =  ">"
+        elseif current = op:LESS_EQUALS
+            operator =  "<="
+        elseif current = op:LESS
+            operator =  "<"
+        elseif current = op:NOT
+            operator =  "!"
+        end
+
+        result = result + " " + operator
+        result = result + " " + right:WriteJavaScript() + ")"
+        return result
+    end
+
+    action Write
+        VisitLineNumber()
+        leftHandSideLabel = GetLeftHandSideLabel()
+        rightHandSideLabel = GetRightHandSideLabel()
+        if not hasParent
+            trueLabel = GetTrueLabel()
+            falseLabel = GetFalseLabel()
+            finalLabel = GetFinalLabel()
+            SetChildLabels(trueLabel, falseLabel)
+        end
+
+        //Set the position that the opcode will jump to.
+        if isAnd
+            if hasParent
+                if opcodeParent:isAnd
+                    jumpLabel = falseLabel
+                else 
+                    if isOnLeft
+                        jumpLabel = opcodeParent:GetRightHandSideLabel()
+                    else 
+                        //does the parent have a parent, cause we're on the RHS
+                        hasParentParent = opcodeParent:hasParent
+                        if hasParentParent
+                            QuorumOpcode parentParent = opcodeParent:opcodeParent
+                            if parentParent is BinaryAndOrOpcode
+                                BinaryAndOrOpcode bop = cast(BinaryAndOrOpcode, opcodeParent:opcodeParent)
+                                jumpLabel = bop:GetJumpLabel()
+                            else
+                                jumpLabel = falseLabel
+                            end
+                        else
+                            jumpLabel = falseLabel
+                        end
+                    end
+                end
+            else
+                jumpLabel = falseLabel
+            end
+        else
+            jumpLabel = trueLabel
+        end
+
+        //visit the left hand side
+        JavaBytecodeMethodWriter methodWriter = GetMethodWriter()
+        methodWriter:VisitLabel(leftHandSideLabel)
+        left:Write()
+
+        //visit the opcode to jump past any unnecessary code.
+        if isAnd
+            methodWriter:VisitJump(opcodes:GetIfEquals(), jumpLabel)
+        else
+            methodWriter:VisitJump(opcodes:GetIfNotEquals(), jumpLabel)
+        end
+        methodWriter:VisitLabel(rightHandSideLabel)
+        right:Write()
+
+        //if there is no parent, write the end of the jumping routine.
+        if not hasParent
+            methodWriter:VisitJump(opcodes:GetIfEquals(), falseLabel)
+            methodWriter:VisitLabel(trueLabel)
+            methodWriter:VisitConstant(1)
+            methodWriter:VisitJump(opcodes:GetGoto(), finalLabel)
+            methodWriter:VisitLabel(falseLabel)
+            methodWriter:VisitConstant(0)
+            methodWriter:VisitLabel(finalLabel)
+        end
+    end
+
+    action SetChildLabels(JavaBytecodeLabel trueLabel, JavaBytecodeLabel falseLabel)
+        me:trueLabel = trueLabel
+        me:falseLabel = falseLabel
+        if left is BinaryAndOrOpcode
+            BinaryAndOrOpcode leftOp = cast(BinaryAndOrOpcode, left)
+            leftOp:SetChildLabels(me:trueLabel, me:falseLabel)
+        end
+
+        if right is BinaryAndOrOpcode
+            BinaryAndOrOpcode rightOp = cast(BinaryAndOrOpcode, right)
+            rightOp:SetChildLabels(me:trueLabel, me:falseLabel)
+        end
+    end
+
+    action GetFinalLabel returns JavaBytecodeLabel
+        if finalLabel = undefined
+            JavaBytecodeLabel f
+            finalLabel = f
+        end
+        return finalLabel
+    end
+
+    action GetFalseLabel returns JavaBytecodeLabel
+        if falseLabel = undefined
+            JavaBytecodeLabel f
+            falseLabel = f
+        end
+        return falseLabel
+    end
+
+    action GetTrueLabel returns JavaBytecodeLabel
+        if trueLabel = undefined
+            JavaBytecodeLabel f
+            trueLabel = f
+        end
+        return trueLabel
+    end
+
+    action GetRightHandSideLabel returns JavaBytecodeLabel
+        if rightHandSideLabel = undefined
+            JavaBytecodeLabel f
+            rightHandSideLabel = f
+        end
+        return rightHandSideLabel
+    end
+
+    action GetJumpLabel returns JavaBytecodeLabel
+        return jumpLabel
+    end
+
+    action GetLeftHandSideLabel returns JavaBytecodeLabel
+        if leftHandSideLabel = undefined
+            JavaBytecodeLabel f
+            leftHandSideLabel = f
+        end
+        return leftHandSideLabel
+    end
+
+    action GetTemplateCopy returns QuorumOpcode
+        BinaryAndOrOpcode opcode
+        Type t = GetType()
+        me:SetType(t:Copy())
+        return opcode
+    end
+end
